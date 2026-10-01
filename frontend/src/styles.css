@@ -1,0 +1,105 @@
+/* Reset total agar layout React tidak berantakan */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f3f4f6;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.login-page {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #eaf5ff 0%, #f8fbff 55%, #e8f0fa 100%);
+}
+
+.login-panel {
+  width: min(100%, 420px);
+  padding: 2rem;
+  border: 1px solid #dbe5ef;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 48px rgba(31, 67, 101, 0.14);
+}
+
+.login-panel h1 {
+  margin: 0 0 0.5rem;
+  color: #12263a;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.login-panel > p {
+  margin: 0 0 1.5rem;
+  color: #6b7f92;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 1rem;
+  border-radius: 14px;
+  background: #eaf5ff;
+  color: #1769a5;
+  font-weight: 800;
+}
+
+.form-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-stack label {
+  display: grid;
+  gap: 0.45rem;
+  color: #344b61;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.form-stack input,
+.form-stack select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cfdae6;
+  border-radius: 9px;
+  outline: none;
+  background: #fbfdff;
+  color: #172033;
+}
+
+.form-stack input:focus,
+.form-stack select:focus {
+  border-color: #2781bd;
+  box-shadow: 0 0 0 4px rgba(39, 129, 189, 0.14);
+}
+
+.primary-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: #1769a5;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  background: #8bb9d7;
+  cursor: not-allowed;
+}
