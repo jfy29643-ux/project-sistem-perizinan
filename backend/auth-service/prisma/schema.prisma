@@ -1,0 +1,33 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model PengajuanIzin {
+  id_pengajuan  Int     @id @default(autoincrement())
+  id_pengguna   Int
+  jenis_kelamin String? @db.VarChar(20)
+  jenis_izin    String? @db.VarChar(50)
+  alasan        String? @db.VarChar(100)
+  tanggal       DateTime? @db.Date
+  waktu_mulai   String? @db.VarChar(10)
+  waktu_selesai String? @db.VarChar(10)
+  keterangan    String?
+
+  @@map("pengajuan_izin")
+}
+
+model VerifikasiPengajuan {
+  id_verifikasi_pengajuan Int       @id @default(autoincrement())
+  id_pengajuan            Int
+  id_guru                 Int
+  status_verifikasi       String?   @db.VarChar(50)
+  catatan_verifikasi      String?   
+  tanggal_verifikasi      DateTime? @db.Timestamp
+
+  @@map("verifikasi_pengajuan")
+}
