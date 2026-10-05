@@ -6,7 +6,6 @@ require('dotenv').config();
 const app = express();
 
 const port = Number(process.env.PORT) || 5002;
-const host = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(express.json());
@@ -269,7 +268,6 @@ app.get('/api/pengajuan', async (req, res) => {
             const verifGuru = (verifikasiGuruList || []).find(v => v.id_pengajuan === item.id_pengajuan);
             const verifSatpam = (verifikasiSatpamList || []).find(v => v.id_pengajuan === item.id_pengajuan);
 
-            // Prioritas utama membaca status langsung dari pengajuan_izin yang sudah di-update guru/satpam
             let statusFinal = item.status || 'Menunggu Konfirmasi';
             let catatanFinal = item.keterangan || '-';
 
@@ -306,17 +304,16 @@ app.get('/api/notifikasi', async (req, res) => {
     try {
         const role = String(req.query.role || '').trim().toLowerCase();
         
-        // Ambil pengajuan yang statusnya masih menunggu atau semua data terbaru untuk dicek
         const { data: pengajuanList, error } = await supabase
             .from('pengajuan_izin')
             .select('*')
             .order('id_pengajuan', { ascending: false })
-            .limit(20); // Batasi 20 data teratas
+            .limit(20);
 
         if (error) throw error;
 
         const notifikasi = (pengajuanList || []).map(item => ({
-            notification_key: String(item.id_pengajuan), // Kunci unik untuk frontend
+            notification_key: String(item.id_pengajuan),
             id_pengajuan: item.id_pengajuan,
             nama_lengkap: item.nama_lengkap || 'Siswa',
             kelas: item.kelas || '-',
@@ -413,7 +410,6 @@ app.post('/api/pengajuan/:idPengajuan/verifikasi', async (req, res) => {
 
         if (errorPengajuan) throw errorPengajuan;
 
-        // 1. UPDATE STATUS LANGSUNG DI TABEL UTAMA (pengajuan_izin)
         const { error: errUpdateStatus } = await supabase
             .from('pengajuan_izin')
             .update({ status: statusSimpan })
@@ -421,7 +417,6 @@ app.post('/api/pengajuan/:idPengajuan/verifikasi', async (req, res) => {
 
         if (errUpdateStatus) throw errUpdateStatus;
 
-        // 2. GURU PIKET
         if (roleLower.includes('guru')) {
             const catatanFinal = statusSimpan === 'Ditolak' ? 'Ditolak oleh Guru Piket' : 'Disetujui oleh Guru Piket';
 
@@ -450,7 +445,6 @@ app.post('/api/pengajuan/:idPengajuan/verifikasi', async (req, res) => {
             });
         }
 
-        // 3. SATPAM
         if (roleLower.includes('satpam')) {
             const catatanFinal = statusSimpan === 'Ditolak' ? 'Ditolak oleh Satpam' : 'Disetujui oleh Satpam';
 
@@ -510,7 +504,7 @@ app.post('/api/pengajuan', async (req, res) => {
         const ketFinal = keterangan || kieterangan || '-';
 
         const payload = {
-            id_pengguna: idSiswaFinal,
+            id_pengguna: idSsiswaFinal = idSiswaFinal,
             nama_lengkap: nama_lengkap ? nama_lengkap.trim() : '-',
             kelas: kelas ? kelas.trim() : '-',
             jenis_kelamin: jenis_kelamin || '-',
@@ -547,10 +541,12 @@ app.post('/api/pengajuan', async (req, res) => {
 
 
 // ============================================================
-// JALANKAN SERVER
+// JALANKAN SERVER (DIPERBAIKI AGAR LINK KLIK DI TERMINAL)
 // ============================================================
 
-app.listen(port, host, async () => {
-    console.log(`🚀 Server Backend aktif di http://${host}:${port}`);
+app.listen(port, async () => {
+    console.log(`🚀 Server Backend aktif! Silakan klik tautan di bawah ini:`);
+    console.log(`   http://localhost:${port}`);
+    console.log(`   http://127.0.0.1:${port}`);
     await sinkronkanSemuaRekap();
 });
