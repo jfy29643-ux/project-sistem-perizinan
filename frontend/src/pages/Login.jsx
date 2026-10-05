@@ -114,6 +114,12 @@ export default function Login({ onLoginSuccess }) {
         );
       }
 
+      if (!API_URL) {
+        throw new Error(
+          'URL backend login belum dikonfigurasi. Atur VITE_AUTH_API_URL ke alamat HTTPS auth backend.'
+        );
+      }
+
 
       /*
       |--------------------------------------------------------------------------
@@ -396,8 +402,9 @@ export default function Login({ onLoginSuccess }) {
       );
 
       setErrorMessage(
-        error.message ||
-        'Terjadi kesalahan koneksi ke server.'
+        error instanceof TypeError || error instanceof SyntaxError || error?.name === 'AbortError'
+          ? 'Server login tidak dapat dijangkau. Pastikan backend auth aktif, HP dan komputer memakai Wi-Fi yang sama, dan halaman dibuka memakai IP komputer (bukan localhost).'
+          : error.message || 'Login gagal. Silakan coba lagi.'
       );
 
 
