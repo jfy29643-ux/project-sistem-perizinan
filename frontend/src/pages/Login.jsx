@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // PASTI SUDAH HTTPS, BUKAN HTTP
-const API_URL = 'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app/api';
+const API_URL = 'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app/';
 
 const ROLE_OPTIONS = [
   { value: 'Siswa', label: 'Siswa' },
