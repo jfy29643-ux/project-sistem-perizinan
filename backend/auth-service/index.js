@@ -8,16 +8,17 @@ const port = Number(process.env.PORT) || 5002;
 const host = process.env.HOST || '0.0.0.0';
 
 // ---------------------------------------------------------------
-// CORS: Longgarkan izin agar Vercel frontend tidak terkena blokir
+// CORS: Konfigurasi lengkap & penanganan Preflight OPTIONS aman
 // ---------------------------------------------------------------
-app.use(
-    cors({
-        origin: true, // Mengizinkan semua origin secara fleksibel (aman untuk Vercel preview & production)
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-    })
-);
+const corsOptions = {
+    origin: true, // Mengizinkan semua origin secara fleksibel (aman untuk Vercel preview & production)
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions)); // Menggunakan regex agar tidak terkena PathError di Express baru
 
 app.use(express.json());
 
