@@ -8,17 +8,14 @@ const port = Number(process.env.PORT) || 5002;
 const host = process.env.HOST || '0.0.0.0';
 
 // ---------------------------------------------------------------
-// CORS: Konfigurasi lengkap & penanganan Preflight OPTIONS aman
+// CORS: Konfigurasi bersih & aman (Tanpa PathError)
 // ---------------------------------------------------------------
-const corsOptions = {
-    origin: true,
-    credentials: true,
+app.use(cors({
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-};
-
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: true
+}));
 
 app.use(express.json());
 
@@ -34,7 +31,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL || 'http://invalid', SUPABASE_KEY || 'invalid');
 
-// Inisialisasi Data Pengguna Default (Opsional, di-try/catch agar tidak bikin crash jika tabel belum ada)
+// Inisialisasi Data Pengguna Default yang aman
 const initDb = async () => {
     try {
         const defaultUsers = [
@@ -51,7 +48,7 @@ const initDb = async () => {
         }
         console.log('✅ Inisialisasi data pengguna di Supabase berhasil!');
     } catch (err) {
-        console.warn('⚠️ Catatan Inisialisasi DB (Abaikan jika tabel pengguna belum dibuat manual):', err.message);
+        console.warn('⚠️ Catatan Inisialisasi DB:', err.message);
     }
 };
 
@@ -60,11 +57,11 @@ if (SUPABASE_URL && SUPABASE_KEY) {
 }
 
 app.get('/', (req, res) => {
-    res.send('Server Backend Pengajuan Izin Aktif dan Terhubung ke Supabase!');
+    res.status(200).send('Server Backend Pengajuan Izin Aktif dan Terhubung ke Supabase!');
 });
 
 app.get('/api/health', (req, res) => {
-    res.json({ ok: true, waktu: new Date().toISOString() });
+    res.status(200).json({ ok: true, waktu: new Date().toISOString() });
 });
 
 // --- ROUTE LOGIN ---
@@ -94,7 +91,7 @@ app.post('/api/login', async (req, res) => {
 
         if (data && data.length > 0) {
             const { kata_sandi: _hapus, ...userTanpaSandi } = data[0];
-           return res.json({ success: true, message: 'Login Berhasil', user: userTanpaSandi });
+            return res.status(200).json({ success: true, message: 'Login Berhasil', user: userTanpaSandi });
         }
 
         return res.status(401).json({ success: false, message: 'Nama pengguna atau kata sandi salah!' });
@@ -112,5 +109,5 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
-// Ekspor untuk Vercel (Serverless)
+// Wajib untuk Vercel (Serverless)
 module.exports = app;
