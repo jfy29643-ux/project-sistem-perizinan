@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_URL = 'http://127.0.0.1:5002/api';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
 
 // Fungsi pembantu untuk menggabungkan siswa kembar dan menghitung total izinnya
 const getSiswaUnik = (dataArray) => {

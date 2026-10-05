@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 
-const API_URL = 'http://127.0.0.1:5002/api';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
 
 const getDateOnly = (value) => {
   if (!value) return '';
@@ -114,6 +114,7 @@ const getStatusVerifikasiSatpam = (item) => {
 
 export default function DashboardSatpam({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('verifikasi');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dataIzin, setDataIzin] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -562,9 +563,26 @@ export default function DashboardSatpam({ user, onLogout }) {
   const logoSekolahUrl = 'logo sekolah.jpeg';
 
   return (
-    <div style={styles.container}>
+    <div className="dashboard-satpam-root" style={styles.container}>
+      <button
+        className="mobile-dashboard-menu"
+        type="button"
+        onClick={() => setMobileMenuOpen((open) => !open)}
+        aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+        aria-expanded={mobileMenuOpen}
+      >
+        {mobileMenuOpen ? 'Tutup' : 'Menu ☰'}
+      </button>
+      {mobileMenuOpen && (
+        <button
+          className="mobile-dashboard-overlay"
+          type="button"
+          aria-label="Tutup menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
       {/* SIDEBAR */}
-      <aside style={styles.sidebar}>
+      <aside className={`dashboard-satpam-sidebar${mobileMenuOpen ? ' sidebar-open' : ''}`} style={styles.sidebar}>
         <div>
           <div style={styles.sidebarHeader}>
             <img src={logoSekolahUrl} alt="Logo Sekolah" style={styles.logoImg} />
@@ -576,7 +594,7 @@ export default function DashboardSatpam({ user, onLogout }) {
 
           <nav style={{ padding: '15px' }}>
             <button
-              onClick={() => setActiveMenu('verifikasi')}
+              onClick={() => { setActiveMenu('verifikasi'); setMobileMenuOpen(false); }}
               style={{
                 ...styles.navButton,
                 backgroundColor: activeMenu === 'verifikasi' ? '#2563eb' : 'transparent',
@@ -587,7 +605,7 @@ export default function DashboardSatpam({ user, onLogout }) {
             </button>
 
             <button
-              onClick={() => setActiveMenu('statistik')}
+              onClick={() => { setActiveMenu('statistik'); setMobileMenuOpen(false); }}
               style={{
                 ...styles.navButton,
                 backgroundColor: activeMenu === 'statistik' ? '#2563eb' : 'transparent',
@@ -610,7 +628,7 @@ export default function DashboardSatpam({ user, onLogout }) {
       </aside>
 
       {/* MAIN */}
-      <main style={styles.main}>
+      <main className="dashboard-satpam-main" style={styles.main}>
         <header style={styles.topbar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '13px', color: '#64748b' }}>

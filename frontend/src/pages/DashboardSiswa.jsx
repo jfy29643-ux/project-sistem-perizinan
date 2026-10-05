@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 
-const API_URL = 'http://127.0.0.1:5002/api';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
 
 export default function DashboardSiswa({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('laporan');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // State form pengajuan
   const [namaLengkap, setNamaLengkap] = useState(user?.nama_lengkap || 'NAPLIHAH');
@@ -1182,6 +1183,7 @@ export default function DashboardSiswa({ user, onLogout }) {
 
   return (
     <div
+      className="dashboard-siswa-root"
       style={{
         display: 'flex',
         minHeight: '100vh',
@@ -1191,7 +1193,25 @@ export default function DashboardSiswa({ user, onLogout }) {
       }}
     >
       {/* ================= SIDEBAR (WARNA PUTIH) ================= */}
+      <button
+        className="mobile-dashboard-menu"
+        type="button"
+        onClick={() => setMobileMenuOpen((open) => !open)}
+        aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+        aria-expanded={mobileMenuOpen}
+      >
+        {mobileMenuOpen ? 'Tutup' : 'Menu ☰'}
+      </button>
+      {mobileMenuOpen && (
+        <button
+          className="mobile-dashboard-overlay"
+          type="button"
+          aria-label="Tutup menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
       <div
+        className={`dashboard-siswa-sidebar${mobileMenuOpen ? ' sidebar-open' : ''}`}
         style={{
           width: '260px',
           backgroundColor: '#ffffff',
@@ -1371,6 +1391,7 @@ export default function DashboardSiswa({ user, onLogout }) {
 
       {/* ================= KONTEN UTAMA ================= */}
       <div
+        className="dashboard-siswa-main"
         style={{
           marginLeft: '260px',
           flex: 1,

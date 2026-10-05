@@ -103,3 +103,110 @@ html, body, #root {
   background: #8bb9d7;
   cursor: not-allowed;
 }
+
+.mobile-dashboard-menu,
+.mobile-dashboard-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-dashboard-menu {
+    display: block;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 120;
+    min-height: 40px;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: 6px;
+    background: #1769a5;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+  }
+
+  .mobile-dashboard-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 98;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .dashboard-siswa-root {
+    min-height: 100dvh !important;
+  }
+
+  .dashboard-siswa-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 110 !important;
+    max-width: min(260px, 85vw) !important;
+  }
+
+  .dashboard-siswa-sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .dashboard-siswa-main {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0 !important;
+  }
+
+  .dashboard-siswa-main > div:first-child {
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0.75rem 1rem 0.75rem 5rem !important;
+  }
+
+  .dashboard-siswa-main > div:nth-child(2) {
+    padding: 1rem !important;
+  }
+
+  .dashboard-satpam-root {
+    min-height: 100dvh !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-satpam-sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    z-index: 110 !important;
+    width: min(250px, 85vw) !important;
+    height: 100dvh !important;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .dashboard-satpam-sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .dashboard-satpam-main {
+    width: 100%;
+    min-width: 0;
+    min-height: 100dvh;
+    overflow: visible !important;
+  }
+
+  .dashboard-satpam-main > header {
+    justify-content: flex-end !important;
+    min-height: 64px;
+    padding: 12px 14px 12px 5rem !important;
+  }
+
+  .dashboard-satpam-main > div:last-child {
+    padding: 14px !important;
+  }
+
+  .dashboard-satpam-main > div:last-child > div {
+    padding: 16px !important;
+  }
+}

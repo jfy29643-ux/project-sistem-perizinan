@@ -20,6 +20,8 @@ import {
   BarChart3,
 } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
+
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -155,7 +157,7 @@ export default function Dashboard() {
       setLoading(true);
       setError("");
 
-      const response = await fetch("http://localhost:5002/api/pengajuan");
+      const response = await fetch(`${API_URL}/pengajuan`);
 
       if (!response.ok) {
         throw new Error(
