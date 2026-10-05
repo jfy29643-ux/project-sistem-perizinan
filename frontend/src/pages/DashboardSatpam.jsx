@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
+import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
 
 const getDateOnly = (value) => {
   if (!value) return '';

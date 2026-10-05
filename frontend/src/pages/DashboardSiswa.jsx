@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
+import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
 
 export default function DashboardSiswa({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('laporan');

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
 import {
   LayoutDashboard,
   Users,
@@ -19,8 +20,6 @@ import {
   RefreshCw,
   BarChart3,
 } from "lucide-react";
-
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002/api`;
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_URL = import.meta.env.VITE_AUTH_API_URL || `http://${window.location.hostname}:5000/api`;
+import { AUTH_API_URL as API_URL } from '../apiConfig';
 
 /*
 |--------------------------------------------------------------------------
