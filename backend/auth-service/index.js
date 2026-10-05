@@ -8,37 +8,21 @@ const port = Number(process.env.PORT) || 5002;
 const host = process.env.HOST || '0.0.0.0';
 
 // ---------------------------------------------------------------
-// CORS: izinkan frontend Vercel + localhost (untuk development)
-// Tambahan domain bisa diisi lewat env ALLOWED_ORIGINS (pisahkan dengan koma)
+// CORS: Longgarkan izin agar Vercel frontend tidak terkena blokir
 // ---------------------------------------------------------------
-const allowedOrigins = [
-    'https://project-sistem-perizinan-b1jm.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    ...(process.env.ALLOWED_ORIGINS || '')
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-];
-
 app.use(
     cors({
-        origin: (origin, callback) => {
-            // tanpa origin = Postman/curl/server-to-server -> boleh
-            if (!origin) return callback(null, true);
-            // izinkan semua domain preview Vercel milik project ini
-            const isVercelPreview = /^https:\/\/project-sistem-perizinan[a-z0-9-]*\.vercel\.app$/.test(origin);
-            if (allowedOrigins.includes(origin) || isVercelPreview) return callback(null, true);
-            return callback(new Error('Origin tidak diizinkan oleh CORS: ' + origin));
-        },
+        origin: true, // Mengizinkan semua origin secara fleksibel (aman untuk Vercel preview & production)
+        credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
     })
 );
+
 app.use(express.json());
 
 // ---------------------------------------------------------------
-// Supabase: kunci diambil dari environment variable (jangan ditulis di kode)
+// Supabase: kunci diambil dari environment variable
 // ---------------------------------------------------------------
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -63,7 +47,7 @@ function adaDiMinggu(tanggal, tanggalAcuan) {
     awalMinggu.setDate(acuanObj.getDate() - hari + 1);
     awalMinggu.setHours(0, 0, 0, 0);
     const akhirMinggu = new Date(awalMinggu);
-    akhirMinggu.setDate(awalMinggu.getDate() + 7);
+    akhirMinggu.setDate(akhirMinggu.getDate() + 7);
     return tanggalObj >= awalMinggu && tanggalObj < akhirMinggu;
 }
 
@@ -87,7 +71,6 @@ const initDb = async () => {
     }
 };
 
-// Hanya dijalankan kalau env sudah lengkap
 if (SUPABASE_URL && SUPABASE_KEY) {
     initDb();
 }
@@ -96,7 +79,6 @@ app.get('/', (req, res) => {
     res.send('Server Backend Pengajuan Izin Aktif dan Terhubung ke Supabase!');
 });
 
-// Endpoint cek kesehatan server (berguna untuk tes dari HP / browser)
 app.get('/api/health', (req, res) => {
     res.json({ ok: true, waktu: new Date().toISOString() });
 });
@@ -114,7 +96,6 @@ app.post('/api/login', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi!' });
     }
 
-    // Escape karakter wildcard (% dan _) supaya ilike hanya mencocokkan teks persis
     const namaAman = nama_pengguna.replace(/[\\%_]/g, '\\$&');
 
     try {
@@ -141,14 +122,6 @@ if (process.env.NODE_ENV !== 'production') {
     app.listen(port, host, () => {
         console.log(`🚀 Server Backend aktif!`);
         console.log(`   Buka di komputer : http://localhost:${port}/api/health`);
-
-        // Tampilkan alamat IP jaringan untuk tes dari HP (Wi-Fi yang sama)
-        const nets = require('os').networkInterfaces();
-        Object.values(nets).flat().forEach((net) => {
-            if (net && net.family === 'IPv4' && !net.internal) {
-                console.log(`   Buka di HP (Wi-Fi sama): http://${net.address}:${port}/api/health`);
-            }
-        });
     });
 }
 
