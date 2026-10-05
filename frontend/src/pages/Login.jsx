@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// Gunakan link Vercel backend Anda yang aktif, BUKAN localhost:5000
+// PASTI SUDAH HTTPS, BUKAN HTTP
 const API_URL = 'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app/api';
 
 const ROLE_OPTIONS = [
