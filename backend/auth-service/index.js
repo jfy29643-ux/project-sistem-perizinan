@@ -12,20 +12,18 @@ const port = Number(process.env.PORT) || 5002;
 const host = process.env.HOST || '0.0.0.0';
 
 // ======================================================
-// CORS
 // ======================================================
-// Bisa diakses dari Vercel, HP, laptop, dan browser lain.
+// CORS Konfigurasi yang Lebih Aman untuk Vercel
+// ======================================================
 app.use(cors({
-    origin: true,
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept'
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     credentials: false
 }));
+
+// Pastikan method OPTIONS di-handle dengan benar untuk mencegah preflight error
+app.options('*', cors());
 
 app.use(express.json());
 
