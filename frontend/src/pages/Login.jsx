@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 // ======================================================
 // URL BACKEND
 // ======================================================
-// Backend sudah di-deploy ke Vercel.
-// Jangan gunakan localhost / 127.0.0.1 di sini.
-const API_URL =
+// Mengambil dari environment variable Vercel secara dinamis
+const API_URL = 
+  import.meta.env.VITE_AUTH_API_URL || 
+  import.meta.env.VITE_API_URL || 
   'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app/api';
 
 // ======================================================

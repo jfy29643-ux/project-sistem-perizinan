@@ -12,7 +12,6 @@ const port = Number(process.env.PORT) || 5002;
 const host = process.env.HOST || '0.0.0.0';
 
 // ======================================================
-// ======================================================
 // CORS Konfigurasi yang Lebih Aman untuk Vercel
 // ======================================================
 app.use(cors({
@@ -22,8 +21,8 @@ app.use(cors({
     credentials: false
 }));
 
-// Pastikan method OPTIONS di-handle dengan benar untuk mencegah preflight error
-app.options('*', cors());
+// PERBAIKAN: Mengganti '*' dengan regex /.*/ agar kompatibel dengan path-to-regexp versi terbaru
+app.options(/.*/, cors());
 
 app.use(express.json());
 
@@ -233,8 +232,6 @@ app.use((req, res) => {
 // ======================================================
 // SERVER LOKAL
 // ======================================================
-// Saat development di laptop, server tetap berjalan.
-// Saat production/Vercel, app diexport sebagai serverless function.
 if (process.env.NODE_ENV !== 'production') {
     app.listen(port, host, () => {
         console.log('========================================');
