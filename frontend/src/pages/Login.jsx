@@ -1,26 +1,7 @@
 import React, { useState } from 'react';
+import { AUTH_API_URL } from './apiconfig'; // Mengambil dari file apiconfig.js yang sudah kita perbaiki
 
-// ======================================================
-// URL BACKEND YANG DIBERSIHKAN
-// ======================================================
-const getCleanApiUrl = () => {
-  let url = 
-    import.meta.env.VITE_AUTH_API_URL || 
-    import.meta.env.VITE_API_URL || 
-    'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app';
-  
-  // Hapus semua garis miring berlebih di ujung URL
-  url = url.replace(/\/+$/, '');
-  
-  // Pastikan akhiran /api selalu ada secara aman
-  if (!url.endsWith('/api')) {
-    url += '/api';
-  }
-  
-  return url;
-};
-
-const API_URL = getCleanApiUrl();
+const API_URL = AUTH_API_URL;
 
 // ======================================================
 // PILIHAN ROLE
@@ -41,7 +22,6 @@ function normalizeRole(role) {
     .toLowerCase()
     .replace(/[\s/-]+/g, '_');
 }
-
 // ======================================================
 // LOGIN
 // ======================================================
