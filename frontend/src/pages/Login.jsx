@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
 
 // ======================================================
-// URL BACKEND
+// URL BACKEND YANG DIBERSIHKAN
 // ======================================================
-// Mengambil dari environment variable Vercel secara dinamis
-const API_URL = 
-  import.meta.env.VITE_AUTH_API_URL || 
-  import.meta.env.VITE_API_URL || 
-  'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app/api';
+const getCleanApiUrl = () => {
+  let url = 
+    import.meta.env.VITE_AUTH_API_URL || 
+    import.meta.env.VITE_API_URL || 
+    'https://project-sistem-perizinan-auth-service-git-main-naplihah.vercel.app';
+  
+  // Hapus semua garis miring berlebih di ujung URL
+  url = url.replace(/\/+$/, '');
+  
+  // Pastikan akhiran /api selalu ada secara aman
+  if (!url.endsWith('/api')) {
+    url += '/api';
+  }
+  
+  return url;
+};
+
+const API_URL = getCleanApiUrl();
 
 // ======================================================
 // PILIHAN ROLE
@@ -53,7 +66,6 @@ export default function Login({ onLoginSuccess }) {
       [name]: value
     }));
 
-    // Hilangkan pesan error ketika mulai mengetik
     if (errorMessage) {
       setErrorMessage('');
     }
@@ -71,9 +83,6 @@ export default function Login({ onLoginSuccess }) {
     setErrorMessage('');
 
     try {
-      // -----------------------------------------------
-      // VALIDASI
-      // -----------------------------------------------
       if (!form.username.trim()) {
         throw new Error('Nama pengguna wajib diisi.');
       }
@@ -82,24 +91,16 @@ export default function Login({ onLoginSuccess }) {
         throw new Error('Kata sandi wajib diisi.');
       }
 
-      // -----------------------------------------------
-      // ALAMAT LOGIN BACKEND
-      // -----------------------------------------------
       const loginURL = `${API_URL}/login`;
 
       console.log('Menghubungkan ke:', loginURL);
 
-      // -----------------------------------------------
-      // REQUEST KE BACKEND
-      // -----------------------------------------------
       const response = await fetch(loginURL, {
         method: 'POST',
-
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
-
         body: JSON.stringify({
           nama_pengguna: form.username.trim(),
           kata_sandi: form.password,
@@ -107,18 +108,13 @@ export default function Login({ onLoginSuccess }) {
         })
       });
 
-      // -----------------------------------------------
-      // AMBIL RESPONSE
-      // -----------------------------------------------
       const textResult = await response.text();
-
       let result;
 
       try {
         result = JSON.parse(textResult);
       } catch (e) {
         console.error('Response dari server:', textResult);
-
         throw new Error(
           'Server mengembalikan respons yang tidak valid. Periksa alamat backend.'
         );
@@ -126,9 +122,6 @@ export default function Login({ onLoginSuccess }) {
 
       console.log('Response login:', result);
 
-      // -----------------------------------------------
-      // CEK RESPONSE SERVER
-      // -----------------------------------------------
       if (!response.ok) {
         throw new Error(
           result.message ||
@@ -142,40 +135,24 @@ export default function Login({ onLoginSuccess }) {
         );
       }
 
-      // -----------------------------------------------
-      // DATA USER
-      // -----------------------------------------------
       const user = result.user;
-
-      const originalRole =
-        user.peran ||
-        user.role ||
-        '';
+      const originalRole = user.peran || user.role || '';
 
       const userRole = normalizeRole(originalRole);
       const selectedRole = normalizeRole(form.role);
 
-      // Admin bisa masuk ke role yang dipilih
       const isAdmin = userRole === 'admin';
 
-      // -----------------------------------------------
-      // CEK ROLE
-      // -----------------------------------------------
       if (!isAdmin) {
         let roleMatches = userRole === selectedRole;
 
-        // Guru / Guru Piket
         if (
           selectedRole === 'guru' &&
-          (
-            userRole.includes('guru') ||
-            userRole === 'guru_piket'
-          )
+          (userRole.includes('guru') || userRole === 'guru_piket')
         ) {
           roleMatches = true;
         }
 
-        // Satpam
         if (
           selectedRole === 'satpam' &&
           userRole.includes('satpam')
@@ -183,7 +160,6 @@ export default function Login({ onLoginSuccess }) {
           roleMatches = true;
         }
 
-        // Siswa
         if (
           selectedRole === 'siswa' &&
           userRole === 'siswa'
@@ -200,12 +176,7 @@ export default function Login({ onLoginSuccess }) {
         }
       }
 
-      // -----------------------------------------------
-      // ROLE AKTIF
-      // -----------------------------------------------
-      const activeRole = isAdmin
-        ? form.role
-        : originalRole;
+      const activeRole = isAdmin ? form.role : originalRole;
 
       const sessionUser = {
         ...user,
@@ -214,37 +185,17 @@ export default function Login({ onLoginSuccess }) {
         peran: activeRole
       };
 
-      // -----------------------------------------------
-      // SIMPAN DATA LOGIN
-      // -----------------------------------------------
-      localStorage.setItem(
-        'token',
-        result.token || 'dummy-jwt-token'
-      );
+      localStorage.setItem('token', result.token || 'dummy-jwt-token');
+      localStorage.setItem('user', JSON.stringify(sessionUser));
+      localStorage.setItem('activeRole', activeRole);
 
-      localStorage.setItem(
-        'user',
-        JSON.stringify(sessionUser)
-      );
-
-      localStorage.setItem(
-        'activeRole',
-        activeRole
-      );
-
-      // -----------------------------------------------
-      // LOGIN BERHASIL
-      // -----------------------------------------------
       onLoginSuccess?.(sessionUser);
 
     } catch (error) {
       console.error('Login error detail:', error);
-
       setErrorMessage(
-        error.message ||
-        'Login gagal. Tidak dapat terhubung ke server.'
+        error.message || 'Login gagal. Tidak dapat terhubung ke server.'
       );
-
     } finally {
       setLoading(false);
     }
@@ -255,10 +206,8 @@ export default function Login({ onLoginSuccess }) {
   // ====================================================
   return (
     <div style={styles.container}>
-
       <div style={styles.card}>
 
-        {/* LOGO SEKOLAH */}
         <div style={styles.logoContainer}>
           <img
             src="/logo_sekolah-removebg-preview.png"
@@ -270,7 +219,6 @@ export default function Login({ onLoginSuccess }) {
           />
         </div>
 
-        {/* JUDUL */}
         <h1 style={styles.title}>
           Sistem Perizinan
         </h1>
@@ -279,23 +227,16 @@ export default function Login({ onLoginSuccess }) {
           Manajemen keluar masuk siswa
         </p>
 
-        {/* PESAN ERROR */}
         {errorMessage && (
           <div style={styles.errorAlert}>
             {errorMessage}
           </div>
         )}
 
-        {/* FORM LOGIN */}
-        <form
-          onSubmit={submit}
-          style={styles.formStack}
-        >
+        <form onSubmit={submit} style={styles.formStack}>
 
-          {/* USERNAME */}
           <label style={styles.label}>
             Nama Pengguna
-
             <input
               name="username"
               type="text"
@@ -309,10 +250,8 @@ export default function Login({ onLoginSuccess }) {
             />
           </label>
 
-          {/* PASSWORD */}
           <label style={styles.label}>
             Kata Sandi
-
             <input
               name="password"
               type="password"
@@ -326,10 +265,8 @@ export default function Login({ onLoginSuccess }) {
             />
           </label>
 
-          {/* ROLE */}
           <label style={styles.label}>
             Masuk sebagai
-
             <select
               name="role"
               value={form.role}
@@ -338,37 +275,28 @@ export default function Login({ onLoginSuccess }) {
               disabled={loading}
             >
               {ROLE_OPTIONS.map((r) => (
-                <option
-                  key={r.value}
-                  value={r.value}
-                >
+                <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
               ))}
             </select>
           </label>
 
-          {/* TOMBOL LOGIN */}
           <button
             type="submit"
             disabled={loading}
             style={{
               ...styles.primaryButton,
               opacity: loading ? 0.7 : 1,
-              cursor: loading
-                ? 'not-allowed'
-                : 'pointer'
+              cursor: loading ? 'not-allowed' : 'pointer'
             }}
           >
-            {loading
-              ? 'Memproses...'
-              : 'Masuk'}
+            {loading ? 'Memproses...' : 'Masuk'}
           </button>
 
         </form>
 
       </div>
-
     </div>
   );
 }
@@ -377,178 +305,106 @@ export default function Login({ onLoginSuccess }) {
 // STYLE
 // ======================================================
 const styles = {
-
   container: {
     position: 'fixed',
     top: 0,
     left: 0,
     width: '100vw',
     height: '100vh',
-
-    background:
-      'linear-gradient(135deg, #edf7ff 0%, #e9f1fa 100%)',
-
+    background: 'linear-gradient(135deg, #edf7ff 0%, #e9f1fa 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-
     padding: '1rem',
-
     zIndex: 99999
   },
-
   card: {
     width: '100%',
     maxWidth: '27rem',
-
     padding: '2.5rem',
-
     borderRadius: '1.25rem',
-
-    background:
-      'rgba(255, 255, 255, 0.96)',
-
-    boxShadow:
-      '0 24px 60px rgba(31, 67, 101, 0.14)',
-
+    background: 'rgba(255, 255, 255, 0.96)',
+    boxShadow: '0 24px 60px rgba(31, 67, 101, 0.14)',
     boxSizing: 'border-box'
   },
-
   logoContainer: {
     width: '5.5rem',
     height: '5.5rem',
-
     margin: '0 auto 1.25rem',
-
     display: 'flex',
     justifyContent: 'center'
   },
-
   schoolLogo: {
     width: '5.5rem',
     height: '5.5rem',
-
     objectFit: 'contain'
   },
-
   title: {
     margin: '0 0 0.5rem',
-
     textAlign: 'center',
-
     color: '#12263a',
-
     fontSize: '1.5rem',
-
     fontWeight: '800'
   },
-
   subtitle: {
     margin: '0 0 1.5rem',
-
     textAlign: 'center',
-
     color: '#6b7f92',
-
     fontSize: '0.875rem'
   },
-
   errorAlert: {
     marginBottom: '1.25rem',
-
     padding: '0.8rem 1rem',
-
     borderRadius: '0.7rem',
-
     background: '#fff1f2',
-
     color: '#be123c',
-
     fontSize: '0.875rem',
-
     textAlign: 'center'
   },
-
   formStack: {
     display: 'flex',
-
     flexDirection: 'column',
-
     gap: '1.25rem'
   },
-
   label: {
     display: 'flex',
-
     flexDirection: 'column',
-
     gap: '0.5rem',
-
     color: '#344b61',
-
     fontSize: '0.8125rem',
-
     fontWeight: '700'
   },
-
   input: {
     width: '100%',
-
     minHeight: '3rem',
-
     padding: '0.75rem 0.9rem',
-
     border: '1px solid #cfdae6',
-
     borderRadius: '0.7rem',
-
     outline: 'none',
-
     background: '#fbfdff',
-
     boxSizing: 'border-box'
   },
-
   select: {
     width: '100%',
-
     minHeight: '3rem',
-
     padding: '0.75rem 0.9rem',
-
     border: '1px solid #cfdae6',
-
     borderRadius: '0.7rem',
-
     outline: 'none',
-
     background: '#ffffff',
-
     boxSizing: 'border-box',
-
     cursor: 'pointer'
   },
-
   primaryButton: {
     width: '100%',
-
     minHeight: '3rem',
-
     marginTop: '0.25rem',
-
     padding: '0.75rem 1rem',
-
     border: 'none',
-
     borderRadius: '0.7rem',
-
     background: '#1769a5',
-
     color: '#ffffff',
-
     fontSize: '0.9375rem',
-
     fontWeight: '750'
   }
-
 };
