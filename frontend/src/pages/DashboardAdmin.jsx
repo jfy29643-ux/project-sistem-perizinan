@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
+import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
 import {
   LayoutDashboard,
   Users,

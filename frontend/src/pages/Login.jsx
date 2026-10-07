@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AUTH_API_URL } from './apiconfig'; // Mengambil dari file apiconfig.js yang sudah kita perbaiki
+import { AUTH_API_URL } from './apiConfig'; // Mengambil dari file apiconfig.js yang sudah kita perbaiki
 
 const API_URL = AUTH_API_URL;
 

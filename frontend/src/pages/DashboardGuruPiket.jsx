@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
+import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
 
 // Fungsi pembantu untuk menggabungkan siswa kembar dan menghitung total izinnya
 const getSiswaUnik = (dataArray) => {

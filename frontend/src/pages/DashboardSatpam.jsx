@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
+import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
 
 const getDateOnly = (value) => {
   if (!value) return '';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { PENGAJUAN_API_URL as API_URL } from '../apiConfig';
+import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
 
 export default function DashboardSiswa({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('laporan');
