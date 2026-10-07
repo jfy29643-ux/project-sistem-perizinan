@@ -18,11 +18,11 @@ app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    credentials: false
+    credentials: true
 }));
 
 // PERBAIKAN: Mengganti '*' dengan regex /.*/ agar kompatibel dengan path-to-regexp versi terbaru
-app.options(/.*/, cors());
+// app.options(/.*/, cors());
 
 app.use(express.json());
 
