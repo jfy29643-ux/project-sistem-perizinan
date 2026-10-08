@@ -7,7 +7,30 @@ const app = express();
 
 const port = Number(process.env.PORT) || 5002;
 
-app.use(cors());
+// ============================================================
+// CORS Konfigurasi untuk Vercel & Localhost
+// ============================================================
+const extraOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+    if (/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$/i.test(origin)) return true;
+    return extraOrigins.includes(origin);
+};
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error('Origin tidak diizinkan oleh CORS: ' + origin));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+
 app.use(express.json());
 
 const SUPABASE_URL =
@@ -244,7 +267,7 @@ app.get('/', (req, res) => {
 
 
 // ============================================================
-// GET SEMUA PENGAJUAN (DIPERBAIKI)
+// GET SEMUA PENGAJUAN
 // ============================================================
 
 app.get('/api/pengajuan', async (req, res) => {
@@ -297,7 +320,7 @@ app.get('/api/pengajuan', async (req, res) => {
 
 
 // ============================================================
-// NOTIFIKASI (DIPERBAIKI)
+// NOTIFIKASI
 // ============================================================
 
 app.get('/api/notifikasi', async (req, res) => {
@@ -385,7 +408,7 @@ app.put('/api/pengajuan/:idPengajuan', async (req, res) => {
 
 
 // ============================================================
-// VERIFIKASI GURU / SATPAM (OTOMATIS UPDATE STATUS)
+// VERIFIKASI GURU / SATPAM
 // ============================================================
 
 app.post('/api/pengajuan/:idPengajuan/verifikasi', async (req, res) => {
@@ -504,7 +527,7 @@ app.post('/api/pengajuan', async (req, res) => {
         const ketFinal = keterangan || kieterangan || '-';
 
         const payload = {
-            id_pengguna: idSsiswaFinal = idSiswaFinal,
+            id_pengguna: idSiswaFinal,
             nama_lengkap: nama_lengkap ? nama_lengkap.trim() : '-',
             kelas: kelas ? kelas.trim() : '-',
             jenis_kelamin: jenis_kelamin || '-',
@@ -541,12 +564,16 @@ app.post('/api/pengajuan', async (req, res) => {
 
 
 // ============================================================
-// JALANKAN SERVER (DIPERBAIKI AGAR LINK KLIK DI TERMINAL)
+// JALANKAN SERVER LOKAL & EXPORT VERCEL
 // ============================================================
 
-app.listen(port, async () => {
-    console.log(`🚀 Server Backend aktif! Silakan klik tautan di bawah ini:`);
-    console.log(`   http://localhost:${port}`);
-    console.log(`   http://127.0.0.1:${port}`);
-    await sinkronkanSemuaRekap();
-});
+if (!process.env.VERCEL) {
+    app.listen(port, async () => {
+        console.log(`🚀 Server Backend aktif! Silakan klik tautan di bawah ini:`);
+        console.log(`   http://localhost:${port}`);
+        console.log(`   http://127.0.0.1:${port}`);
+        await sinkronkanSemuaRekap();
+    });
+}
+
+module.exports = app;

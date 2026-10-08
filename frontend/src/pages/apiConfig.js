@@ -1,16 +1,13 @@
-const apiUrl = (configuredUrl, fallbackUrl) => {
-  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
-  if (import.meta.env.DEV) return 'http://localhost:5002'; // Disesuaikan ke port 5002 sesuai config Vite Anda
-  return fallbackUrl;
+const getDynamicApiUrl = (defaultPort = '5000') => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return `http://localhost:${defaultPort}`;
+  }
+  return ''; // Kosongkan agar langsung menggunakan URL fallback Vercel di bawah
 };
 
-// Menggunakan URL backend Vercel utama Anda yang aktif
-export const AUTH_API_URL = apiUrl(
-  import.meta.env.VITE_AUTH_API_URL,
-  'https://project-sistem-perizinan-auth-servi.vercel.app'
-);
+// Tambahkan /api di akhir URL agar sesuai dengan backend Express Anda
+export const AUTH_API_URL = 
+  import.meta.env.VITE_AUTH_API_URL || 'https://project-sistem-perizinan-auth-servi.vercel.app/';
 
-export const PENGAJUAN_API_URL = apiUrl(
-  import.meta.env.VITE_API_URL,
-  'https://project-sistem-perizinan-auth-servi.vercel.app'
-);
+export const PENGAJUAN_API_URL = 
+  import.meta.env.VITE_API_URL || 'https://project-sistem-perizinan.vercel.app/api';

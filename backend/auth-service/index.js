@@ -6,23 +6,34 @@ require('dotenv').config();
 const app = express();
 
 // ======================================================
-// SERVER
+// SERVER (Diatur default ke port 5001 untuk Auth Service)
 // ======================================================
-const port = Number(process.env.PORT) || 5002;
+const port = 5001;
 const host = process.env.HOST || '0.0.0.0';
 
 // ======================================================
-// CORS Konfigurasi yang Lebih Aman untuk Vercel
+// CORS Konfigurasi yang Lebih Aman untuk Vercel & Development
 // ======================================================
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    credentials: true
-}));
+const extraOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
 
-// PERBAIKAN: Mengganti '*' dengan regex /.*/ agar kompatibel dengan path-to-regexp versi terbaru
-// app.options(/.*/, cors());
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true; // Postman, curl, server-to-server
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+    if (/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$/i.test(origin)) return true;
+    return extraOrigins.includes(origin);
+};
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error('Origin tidak diizinkan oleh CORS: ' + origin));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 
 app.use(express.json());
 
@@ -118,7 +129,7 @@ if (SUPABASE_URL && SUPABASE_KEY) {
 app.get('/', (req, res) => {
     res.status(200).json({
         success: true,
-        message: 'Server Backend Sistem Perizinan Aktif',
+        message: 'Server Backend Auth Sistem Perizinan Aktif',
         status: 'online',
         database: SUPABASE_URL ? 'Supabase configured' : 'Supabase belum dikonfigurasi',
         waktu: new Date().toISOString()
@@ -132,7 +143,7 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({
         success: true,
         ok: true,
-        message: 'Backend API aktif',
+        message: 'Backend Auth API aktif',
         waktu: new Date().toISOString()
     });
 });
@@ -195,7 +206,8 @@ app.post('/api/login', async (req, res) => {
             return res.status(200).json({
                 success: true,
                 message: 'Login Berhasil',
-                user: userTanpaPassword
+                user: userTanpaPassword,
+                token: 'dummy-jwt-token-auth'
             });
         }
 
@@ -232,10 +244,10 @@ app.use((req, res) => {
 // ======================================================
 // SERVER LOKAL
 // ======================================================
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.VERCEL) {
     app.listen(port, host, () => {
         console.log('========================================');
-        console.log('🚀 BACKEND SISTEM PERIZINAN AKTIF');
+        console.log('🚀 BACKEND AUTH SISTEM PERIZINAN AKTIF');
         console.log('========================================');
         console.log(`Local  : http://localhost:${port}`);
         console.log(`Health : http://localhost:${port}/api/health`);

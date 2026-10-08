@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { AUTH_API_URL } from './apiConfig'; // Mengambil dari file apiconfig.js yang sudah kita perbaiki
 
-const API_URL = AUTH_API_URL;
+// ======================================================
+// URL API OTOMATIS
+// - Dibuka di localhost  -> auth backend di http://localhost:5001 (TIDAK DIUBAH)
+// - Dibuka di Vercel     -> langsung mengarah ke backend auth Vercel Anda
+// ======================================================
+const isLocalhost = ['localhost', '127.0.0.1'].includes(
+  window.location.hostname
+);
+
+const API_BASE_URL = isLocalhost
+  ? 'http://localhost:5001'
+  : (import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || 'https://project-sistem-perizinan-auth-servi.vercel.app');
 
 // ======================================================
 // PILIHAN ROLE
@@ -22,8 +32,9 @@ function normalizeRole(role) {
     .toLowerCase()
     .replace(/[\s/-]+/g, '_');
 }
+
 // ======================================================
-// LOGIN
+// LOGIN COMPONENT
 // ======================================================
 export default function Login({ onLoginSuccess }) {
   const [form, setForm] = useState({
@@ -71,7 +82,7 @@ export default function Login({ onLoginSuccess }) {
         throw new Error('Kata sandi wajib diisi.');
       }
 
-      const loginURL = `${API_URL}/login`;
+      const loginURL = `${API_BASE_URL}/api/login`;
 
       console.log('Menghubungkan ke:', loginURL);
 
@@ -96,7 +107,7 @@ export default function Login({ onLoginSuccess }) {
       } catch (e) {
         console.error('Response dari server:', textResult);
         throw new Error(
-          'Server mengembalikan respons yang tidak valid. Periksa alamat backend.'
+          'Server mengembalikan respons yang tidak valid. Periksa apakah layanan auth backend sudah berjalan.'
         );
       }
 
@@ -173,8 +184,15 @@ export default function Login({ onLoginSuccess }) {
 
     } catch (error) {
       console.error('Login error detail:', error);
+
+      const isNetworkError =
+        error instanceof TypeError &&
+        /fetch|network/i.test(error.message || '');
+
       setErrorMessage(
-        error.message || 'Login gagal. Tidak dapat terhubung ke server.'
+        isNetworkError
+          ? `Tidak dapat terhubung ke server (${API_BASE_URL}). Pastikan backend auth sudah berjalan.`
+          : error.message || 'Login gagal. Tidak dapat terhubung ke server.'
       );
     } finally {
       setLoading(false);
