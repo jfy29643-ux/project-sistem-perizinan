@@ -161,21 +161,24 @@ export default function DashboardSatpam({ user, onLogout }) {
     return () => timers.forEach(clearTimeout);
   }, [notifikasiSatpam]);
 
-  const fetchPengajuan = async () => {
+  // senyap = true -> refresh di belakang layar (tabel tidak berkedip / bergeser)
+  const fetchPengajuan = async ({ senyap = false } = {}) => {
     try {
-      setLoading(true);
+      if (!senyap) setLoading(true);
       const response = await authFetch(`${API_URL}/pengajuan?role=satpam`);
       const result = await response.json();
 
       if (response.ok && result.success) {
-        setDataIzin(Array.isArray(result.data) ? result.data : []);
+        const dataBaru = Array.isArray(result.data) ? result.data : [];
+        // Kalau isinya sama persis, jangan ganti state supaya tampilan tidak ikut bergerak
+        setDataIzin((lama) => (JSON.stringify(lama) === JSON.stringify(dataBaru) ? lama : dataBaru));
       } else {
         console.error('Gagal mengambil data:', result.message);
       }
     } catch (error) {
       console.error('Kesalahan koneksi ke server backend:', error);
     } finally {
-      setLoading(false);
+      if (!senyap) setLoading(false);
     }
   };
 
@@ -323,6 +326,7 @@ export default function DashboardSatpam({ user, onLogout }) {
         setSelectedItem(null);
         setCatatanInput('');
         setActionType('');
+        fetchPengajuan({ senyap: true });
       } else {
         alert('Gagal menyimpan ke database: ' + (result.message || 'Terjadi kesalahan'));
       }
@@ -572,13 +576,13 @@ export default function DashboardSatpam({ user, onLogout }) {
   return (
     <div className="dashboard-satpam-root" style={styles.container}>
       <button
-        className="mobile-dashboard-menu"
+        className="mobile-dots-btn"
         type="button"
         onClick={() => setMobileMenuOpen((open) => !open)}
         aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
         aria-expanded={mobileMenuOpen}
       >
-        {mobileMenuOpen ? 'Tutup' : 'Menu ☰'}
+        ⋮
       </button>
       {mobileMenuOpen && (
         <button
@@ -735,14 +739,14 @@ export default function DashboardSatpam({ user, onLogout }) {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button style={styles.btnReload} onClick={fetchPengajuan}>
+                  <button style={styles.btnReload} onClick={() => fetchPengajuan()}>
                     Muat Ulang
                   </button>
                 </div>
               </div>
 
-              <div style={{ width: '100%', overflowX: 'auto' }}>
-                <table style={styles.table}>
+              <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto' }}>
+                <table className="rt" style={styles.table}>
                   <thead>
                     <tr style={styles.trHead}>
                       <th style={styles.th}>ID</th>
@@ -756,7 +760,7 @@ export default function DashboardSatpam({ user, onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {loading && dataIzin.length === 0 ? (
                       <tr>
                         <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
                           Memuat data dari database...
@@ -776,18 +780,18 @@ export default function DashboardSatpam({ user, onLogout }) {
 
                         return (
                           <tr key={row.id_pengajuan} style={styles.trBody}>
-                            <td style={styles.td}>{row.id_pengajuan}</td>
-                            <td style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
-                            <td style={styles.td}>{row.kelas}</td>
-                            <td style={styles.td}>{row.jenis_izin}</td>
-                            <td style={{ ...styles.td, fontWeight: 'bold', color: '#2563eb' }}>
+                            <td data-label="ID" style={styles.td}>{row.id_pengajuan}</td>
+                            <td data-label="Nama Siswa" style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
+                            <td data-label="Kelas" style={styles.td}>{row.kelas}</td>
+                            <td data-label="Jenis Izin" style={styles.td}>{row.jenis_izin}</td>
+                            <td data-label="Jam Kembali" style={{ ...styles.td, fontWeight: 'bold', color: '#2563eb' }}>
                               {getJamKembaliValue(row)}
                             </td>
-                            <td style={{ ...styles.td, fontStyle: 'italic', color: '#64748b' }}>
+                            <td data-label="Catatan Verifikasi" style={{ ...styles.td, fontStyle: 'italic', color: '#64748b' }}>
                               {row.catatan_verifikasi || 'Belum diverifikasi oleh Satpam'}
                             </td>
-                            <td style={styles.td}>{String(row.tanggal || '').split('T')[0]}</td>
-                            <td style={{ ...styles.td, textAlign: 'center' }}>
+                            <td data-label="Tanggal" style={styles.td}>{String(row.tanggal || '').split('T')[0]}</td>
+                            <td data-label="Aksi / Status" style={{ ...styles.td, textAlign: 'center' }}>
                               {sudahDiverifikasiSatpam ? (
                                 statusSatpam === 'Disetujui' ? (
                                   <span style={styles.badgeSuccess}>Disetujui</span>
@@ -829,7 +833,7 @@ export default function DashboardSatpam({ user, onLogout }) {
                       Rekapitulasi jumlah izin berdasarkan tanggal, jenis kelamin, kelas, mingguan, dan bulanan.
                     </p>
                   </div>
-                  <button style={styles.btnReload} onClick={fetchPengajuan}>
+                  <button style={styles.btnReload} onClick={() => fetchPengajuan()}>
                     Muat Ulang
                   </button>
                 </div>
@@ -858,8 +862,8 @@ export default function DashboardSatpam({ user, onLogout }) {
                       Tutup Tabel
                     </button>
                   </div>
-                  <div style={{ width: '100%', overflowX: 'auto' }}>
-                    <table style={styles.table}>
+                  <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto' }}>
+                    <table className="rt" style={styles.table}>
                       <thead>
                         <tr style={styles.trHeadGrafik}>
                           <th style={styles.thGrafik}>Nama</th>
@@ -875,11 +879,11 @@ export default function DashboardSatpam({ user, onLogout }) {
                         ) : (
                           filteredDateData.map((row, idx) => (
                             <tr key={idx} style={styles.trBody}>
-                              <td style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
-                              <td style={styles.td}>{row.kelas}</td>
-                              <td style={styles.td}>{row.jenis_kelamin || '-'}</td>
-                              <td style={styles.td}>{row.alasan}</td>
-                              <td style={styles.td}>{row.total_izin}</td>
+                              <td data-label="Nama" style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
+                              <td data-label="Kelas" style={styles.td}>{row.kelas}</td>
+                              <td data-label="Jenis Kelamin" style={styles.td}>{row.jenis_kelamin || '-'}</td>
+                              <td data-label="Alasan" style={styles.td}>{row.alasan}</td>
+                              <td data-label="Total Izin" style={styles.td}>{row.total_izin}</td>
                             </tr>
                           ))
                         )}
@@ -890,7 +894,7 @@ export default function DashboardSatpam({ user, onLogout }) {
               )}
 
               {/* GRAFIK KELAMIN & KELAS */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
                 <div style={styles.card}>
                   <h3 style={{ margin: '0 0 15px 0', fontSize: '15px', color: '#1e293b' }}>Grafik Jenis Kelamin</h3>
                   <div style={{ position: 'relative', height: '220px', width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -926,8 +930,8 @@ export default function DashboardSatpam({ user, onLogout }) {
                       Tutup Tabel
                     </button>
                   </div>
-                  <div style={{ width: '100%', overflowX: 'auto' }}>
-                    <table style={styles.table}>
+                  <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto' }}>
+                    <table className="rt" style={styles.table}>
                       <thead>
                         <tr style={styles.trHeadGrafik}>
                           <th style={styles.thGrafik}>Nama</th>
@@ -943,11 +947,11 @@ export default function DashboardSatpam({ user, onLogout }) {
                         ) : (
                           filteredWeeklyData.map((row, idx) => (
                             <tr key={idx} style={styles.trBody}>
-                              <td style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
-                              <td style={styles.td}>{row.kelas}</td>
-                              <td style={styles.td}>{row.jenis_kelamin || '-'}</td>
-                              <td style={styles.td}>{row.alasan}</td>
-                              <td style={styles.td}>{row.total_izin}</td>
+                              <td data-label="Nama" style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
+                              <td data-label="Kelas" style={styles.td}>{row.kelas}</td>
+                              <td data-label="Jenis Kelamin" style={styles.td}>{row.jenis_kelamin || '-'}</td>
+                              <td data-label="Alasan" style={styles.td}>{row.alasan}</td>
+                              <td data-label="Total Izin" style={styles.td}>{row.total_izin}</td>
                             </tr>
                           ))
                         )}
@@ -978,8 +982,8 @@ export default function DashboardSatpam({ user, onLogout }) {
                       Tutup Tabel
                     </button>
                   </div>
-                  <div style={{ width: '100%', overflowX: 'auto' }}>
-                    <table style={styles.table}>
+                  <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto' }}>
+                    <table className="rt" style={styles.table}>
                       <thead>
                         <tr style={styles.trHeadGrafik}>
                           <th style={styles.thGrafik}>Nama</th>
@@ -995,11 +999,11 @@ export default function DashboardSatpam({ user, onLogout }) {
                         ) : (
                           filteredMonthlyData.map((row, idx) => (
                             <tr key={idx} style={styles.trBody}>
-                              <td style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
-                              <td style={styles.td}>{row.kelas}</td>
-                              <td style={styles.td}>{row.jenis_kelamin || '-'}</td>
-                              <td style={styles.td}>{row.alasan}</td>
-                              <td style={styles.td}>{row.total_izin}</td>
+                              <td data-label="Nama" style={{ ...styles.td, fontWeight: '600', color: '#0f172a' }}>{row.nama_lengkap}</td>
+                              <td data-label="Kelas" style={styles.td}>{row.kelas}</td>
+                              <td data-label="Jenis Kelamin" style={styles.td}>{row.jenis_kelamin || '-'}</td>
+                              <td data-label="Alasan" style={styles.td}>{row.alasan}</td>
+                              <td data-label="Total Izin" style={styles.td}>{row.total_izin}</td>
                             </tr>
                           ))
                         )}

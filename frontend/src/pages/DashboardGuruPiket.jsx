@@ -30,31 +30,38 @@ export default function DashboardGuruPiket({ user, onLogout }) {
     return () => clearInterval(interval);
   }, []);
 
-  const muatDataDariDatabase = async () => {
-    setLoading(true);
-    setErrorMessage('');
+  // senyap = true  -> refresh di belakang layar (tanpa "Memuat...", tabel tidak berkedip/bergeser)
+  // senyap = false -> dipakai saat pertama buka & tombol "Muat Ulang"
+  const muatDataDariDatabase = async ({ senyap = false } = {}) => {
+    if (!senyap) {
+      setLoading(true);
+      setErrorMessage('');
+    }
     try {
       const response = await authFetch(`${API_URL}/pengajuan`);
       const result = await response.json();
-      
+
       if (response.ok) {
-        setDaftarIzin(Array.isArray(result) ? result : (result.data || []));
-      } else {
+        const dataBaru = Array.isArray(result) ? result : (result.data || []);
+        // Kalau isinya sama persis, jangan ganti state supaya tampilan tidak ikut bergerak
+        setDaftarIzin((lama) => (JSON.stringify(lama) === JSON.stringify(dataBaru) ? lama : dataBaru));
+      } else if (!senyap) {
         setErrorMessage(result.message || 'Gagal memuat data dari database.');
-        setDaftarIzin([]);
       }
     } catch (error) {
       console.error('Gagal terhubung ke server:', error);
-      setErrorMessage('Terjadi kesalahan koneksi ke server.');
-      setDaftarIzin([]);
+      if (!senyap) setErrorMessage('Terjadi kesalahan koneksi ke server.');
     } finally {
-      setLoading(false);
+      if (!senyap) setLoading(false);
     }
   };
 
   useEffect(() => {
     muatDataDariDatabase();
-    const intervalSync = setInterval(muatDataDariDatabase, 5000);
+    // Pembaruan otomatis hanya di belakang layar, dan dilewati kalau tab sedang tidak dilihat
+    const intervalSync = setInterval(() => {
+      if (!document.hidden) muatDataDariDatabase({ senyap: true });
+    }, 10000);
     return () => clearInterval(intervalSync);
   }, []);
 
@@ -80,7 +87,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
 
       if (response.ok) {
         setActionMessage(`Pengajuan ${item.nama_lengkap || item.nama || 'siswa'} berhasil ${status.toLowerCase()}.`);
-        muatDataDariDatabase();
+        muatDataDariDatabase({ senyap: true });
         setTimeout(() => setActionMessage(''), 4000);
       } else {
         setErrorMessage(result.message || 'Gagal memproses verifikasi.');
@@ -331,7 +338,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                   ⚠️ Ada <strong>{jumlahPending}</strong> pengajuan siswa baru yang perlu diverifikasi!
                 </div>
               )}
-              <button onClick={muatDataDariDatabase} disabled={loading} style={styles.reloadButton}>
+              <button onClick={() => muatDataDariDatabase()} disabled={loading} style={{ ...styles.reloadButton, minWidth: '104px' }}>
                 {loading ? 'Memuat...' : 'Muat Ulang'}
               </button>
             </div>
@@ -404,8 +411,8 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                     {dataDetailTanggal.length === 0 ? (
                       <p style={styles.mutedText}>Tidak ada izin pada tanggal ini.</p>
                     ) : (
-                      <div style={styles.tableWrapper}>
-                        <table cellPadding="10" style={styles.detailTable}>
+                      <div className="rt-wrap" style={styles.tableWrapper}>
+                        <table className="rt" cellPadding="10" style={styles.detailTable}>
                           <thead>
                             <tr>
                               <th>Nama</th>
@@ -418,11 +425,11 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                           <tbody>
                             {getSiswaUnik(dataDetailTanggal).map((item, index) => (
                               <tr key={`${item.id || index}-${item.nama_lengkap}`}>
-                                <td>{item.nama_lengkap || item.nama || '-'}</td>
-                                <td>{item.kelas || '-'}</td>
-                                <td>{item.jenis_kelamin || '-'}</td>
-                                <td>{item.jenis_izin || '-'}</td>
-                                <td>{item.status || '-'}</td>
+                                <td data-label="Nama">{item.nama_lengkap || item.nama || '-'}</td>
+                                <td data-label="Kelas">{item.kelas || '-'}</td>
+                                <td data-label="Jenis Kelamin">{item.jenis_kelamin || '-'}</td>
+                                <td data-label="Jenis Izin">{item.jenis_izin || '-'}</td>
+                                <td data-label="Status">{item.status || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -497,8 +504,8 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                     {dataDetailBulan.length === 0 ? (
                       <p style={styles.mutedText}>Tidak ada izin pada bulan ini.</p>
                     ) : (
-                      <div style={styles.tableWrapper}>
-                        <table cellPadding="10" style={styles.detailTable}>
+                      <div className="rt-wrap" style={styles.tableWrapper}>
+                        <table className="rt" cellPadding="10" style={styles.detailTable}>
                           <thead>
                             <tr>
                               <th>Nama</th>
@@ -512,12 +519,12 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                           <tbody>
                             {getSiswaUnik(dataDetailBulan).map((item, index) => (
                               <tr key={`${item.id || index}-${item.nama_lengkap}`}>
-                                <td>{item.nama_lengkap || item.nama || '-'}</td>
-                                <td>{item.kelas || '-'}</td>
-                                <td>{item.jenis_kelamin || '-'}</td>
-                                <td>{item.jenis_izin || '-'}</td>
-                                <td>{formatTanggal(item.tanggal)}</td>
-                                <td>{item.status || '-'}</td>
+                                <td data-label="Nama">{item.nama_lengkap || item.nama || '-'}</td>
+                                <td data-label="Kelas">{item.kelas || '-'}</td>
+                                <td data-label="Jenis Kelamin">{item.jenis_kelamin || '-'}</td>
+                                <td data-label="Jenis Izin">{item.jenis_izin || '-'}</td>
+                                <td data-label="Tanggal">{formatTanggal(item.tanggal)}</td>
+                                <td data-label="Status">{item.status || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -531,8 +538,8 @@ export default function DashboardGuruPiket({ user, onLogout }) {
           )}
 
           {activeMenu === 'verifikasi' && (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+            <div className="rt-wrap" style={styles.tableWrapper}>
+              <table className="rt" style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeaderRow}>
                     <th style={styles.th}>ID</th>
@@ -545,7 +552,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {loading && daftarIzin.length === 0 ? (
                     <tr><td colSpan="7" style={styles.emptyData}>Memuat data...</td></tr>
                   ) : dataTerfilter.length === 0 ? (
                     <tr>
@@ -559,13 +566,13 @@ export default function DashboardGuruPiket({ user, onLogout }) {
 
                       return (
                         <tr key={idItem} style={styles.tableBodyRow}>
-                          <td style={styles.td}>{idItem}</td>
-                          <td style={styles.td}>{item.nama_lengkap || item.nama || '-'}</td>
-                          <td style={styles.td}>{item.kelas || '-'}</td>
-                          <td style={styles.td}>{item.jenis_izin || '-'}</td>
-                          <td style={styles.td}>{item.catatan_verifikasi || item.keterangan || item.alasan || '-'}</td>
-                          <td style={styles.td}>{formatTanggal(item.tanggal)}</td>
-                          <td style={{ ...styles.td, ...styles.statusCell }}>
+                          <td data-label="ID" style={styles.td}>{idItem}</td>
+                          <td data-label="Nama Siswa" style={styles.td}>{item.nama_lengkap || item.nama || '-'}</td>
+                          <td data-label="Kelas" style={styles.td}>{item.kelas || '-'}</td>
+                          <td data-label="Jenis Izin" style={styles.td}>{item.jenis_izin || '-'}</td>
+                          <td data-label="Keterangan" style={styles.td}>{item.catatan_verifikasi || item.keterangan || item.alasan || '-'}</td>
+                          <td data-label="Tanggal" style={styles.td}>{formatTanggal(item.tanggal)}</td>
+                          <td data-label="Aksi / Status" style={{ ...styles.td, ...styles.statusCell }}>
                             {!isMenunggu ? (
                               <span style={{ fontWeight: 'bold', color: statusItem.includes('disetujui') ? '#16a34a' : '#dc2626' }}>
                                 {item.status}

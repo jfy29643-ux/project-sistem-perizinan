@@ -254,3 +254,86 @@ html, body, #root {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* ======================================================
+   ANTI LOMPAT: browser tidak menggeser scroll sendiri
+   saat isi halaman berubah (mis. data di-refresh)
+   ====================================================== */
+html {
+  overflow-anchor: none;
+}
+
+/* ======================================================
+   TABEL RESPONSIF (class "rt")
+   Desktop : tabel biasa
+   HP      : tiap baris jadi kartu, tidak perlu digeser ke samping
+   Setiap <td> wajib punya atribut data-label="Nama Kolom"
+   ====================================================== */
+@media (max-width: 768px) {
+  .rt-wrap {
+    overflow-x: visible !important;
+    max-height: none !important;
+  }
+
+  table.rt {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: separate;
+  }
+
+  table.rt thead {
+    display: none;
+  }
+
+  table.rt tbody {
+    display: block;
+  }
+
+  table.rt tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 4px 12px;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px;
+    background: #ffffff !important;
+  }
+
+  table.rt td {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: auto !important;
+    padding: 8px 0 !important;
+    border: 0 !important;
+    border-bottom: 1px dashed #e8edf3 !important;
+    text-align: right !important;
+    overflow-wrap: anywhere;
+  }
+
+  table.rt td:last-child {
+    border-bottom: 0 !important;
+  }
+
+  table.rt td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    max-width: 38%;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  table.rt td[colspan] {
+    display: block !important;
+    text-align: center !important;
+  }
+
+  table.rt td[colspan]::before {
+    content: none;
+  }
+}

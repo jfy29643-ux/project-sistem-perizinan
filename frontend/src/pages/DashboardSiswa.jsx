@@ -1,6 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { API_URL, authFetch } from './apiConfig';
 
+const sel = { padding: '0.7rem', borderBottom: '1px solid #f1f5f9', textAlign: 'left' };
+
+function TabelDetail({ data, tampilTanggal, formatTanggal }) {
+  return (
+    <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', maxHeight: '360px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+      <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: tampilTanggal ? '640px' : '560px' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8fafc', color: '#475569' }}>
+            {['Nama', 'Kelas', 'Jenis Kelamin', ...(tampilTanggal ? ['Tanggal'] : []), 'Jenis Izin', 'Alasan / Keterangan'].map((judul) => (
+              <th key={judul} style={{ padding: '0.7rem', textAlign: 'left', position: 'sticky', top: 0, backgroundColor: '#f8fafc', whiteSpace: 'nowrap' }}>{judul}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item, idx) => (
+            <tr key={item.id_pengajuan || item.id || idx}>
+              <td data-label="Nama" style={{ ...sel, fontWeight: '600' }}>{item.nama_lengkap}</td>
+              <td data-label="Kelas" style={sel}>{item.kelas}</td>
+              <td data-label="Jenis Kelamin" style={sel}>{item.jenis_kelamin}</td>
+              {tampilTanggal && <td data-label="Tanggal" style={sel}>{formatTanggal(item.tanggal)}</td>}
+              <td data-label="Jenis Izin" style={sel}>{item.jenis_izin}</td>
+              <td data-label="Alasan" style={sel}>{item.alasan || item.keterangan}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function DashboardSiswa({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('laporan');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -28,7 +58,7 @@ export default function DashboardSiswa({ user, onLogout }) {
   const [idYangDiedit, setIdYangDiedit] = useState(null);
   
   const [daftarIzin, setDaftarIzin] = useState([]);
-  const [waktuSekarang, setWaktuSekarang] = useState(new Date());
+  const [waktuSekarang] = useState(() => new Date());
 
   const namaAkun =
     user?.nama_pengguna ||
@@ -52,33 +82,28 @@ export default function DashboardSiswa({ user, onLogout }) {
     return str.split('T')[0];
   }
 
-  const ambilDataIzin = async () => {
+  const ambilDataIzin = async ({ senyap = false } = {}) => {
     try {
-      setLoadingData(true);
+      if (!senyap) setLoadingData(true);
       const response = await authFetch(`${API_URL}/pengajuan`);
       const result = await response.json();
-      if (Array.isArray(result)) {
-        setDaftarIzin(result);
-      } else if (result && Array.isArray(result.data)) {
-        setDaftarIzin(result.data);
+      const dataBaru = Array.isArray(result) ? result : (result && Array.isArray(result.data) ? result.data : null);
+      if (dataBaru) {
+        // Jangan ganti state kalau isinya sama, supaya tampilan tidak ikut bergerak
+        setDaftarIzin((lama) => (JSON.stringify(lama) === JSON.stringify(dataBaru) ? lama : dataBaru));
       }
     } catch (error) {
       console.error('Gagal mengambil data dari database:', error);
     } finally {
-      setLoadingData(false);
+      if (!senyap) setLoadingData(false);
     }
   };
 
   useEffect(() => {
     ambilDataIzin();
     // Auto-refresh data setiap 5 detik agar grafik langsung sync setelah submit
-    const interval = setInterval(ambilDataIzin, 5000);
+    const interval = setInterval(() => ambilDataIzin({ senyap: true }), 5000);
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setWaktuSekarang(new Date()), 1000);
-    return () => clearInterval(timer);
   }, []);
 
   // SUBMIT ATAU UPDATE KE DATABASE
@@ -130,7 +155,7 @@ export default function DashboardSiswa({ user, onLogout }) {
         setWaktuSelesai('');
         setIsEditing(false);
         setIdYangDiedit(null);
-        await ambilDataIzin(); // Segera ambil data terbaru
+        await ambilDataIzin({ senyap: true }); // Segera ambil data terbaru
         setActiveMenu('laporan');
       } else {
         throw new Error(result.message || 'Gagal menyimpan pengajuan');
@@ -432,7 +457,7 @@ export default function DashboardSiswa({ user, onLogout }) {
             <div style={{ maxWidth: '950px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               
               {/* REKAPITULASI TANGGAL */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem 2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#1e293b' }}>1. Rekapitulasi Jumlah Izin (Berdasarkan Tanggal)</h4>
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Klik salah satu tanggal pada grafik untuk melihat rincian.</p>
                 <div style={{ position: 'relative', height: '220px', marginTop: '2.5rem', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundImage: 'linear-gradient(to bottom, transparent 49.5%, #e2e8f0 50%, transparent 50.5%)', display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', padding: '0 1rem 1.75rem 2.25rem' }}>
@@ -443,12 +468,12 @@ export default function DashboardSiswa({ user, onLogout }) {
                     const barHeight = count > 0 ? Math.max((count / maxCount) * 100, 25) : 0;
 
                     return (
-                      <div key={tglItem.full} onClick={() => setTanggalTerpilih(tglItem.full)} style={{ width: '36px', height: '100%', position: 'relative', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        <div style={{ width: '36px', height: `${barHeight}%`, minHeight: count > 0 ? '30px' : '0px', backgroundColor: '#e5e7eb', display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div key={tglItem.full} onClick={() => setTanggalTerpilih(tglItem.full)} style={{ flex: '1 1 0', maxWidth: '36px', minWidth: 0, height: '100%', position: 'relative', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <div style={{ width: '100%', height: `${barHeight}%`, minHeight: count > 0 ? '30px' : '0px', backgroundColor: '#e5e7eb', display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px', overflow: 'hidden' }}>
                           {jumlahWarna.izin > 0 && <div style={{ height: `${(jumlahWarna.izin / count) * 100}%`, width: '100%', backgroundColor: '#3b82f6' }} />}
                           {jumlahWarna.sakit > 0 && <div style={{ height: `${(jumlahWarna.sakit / count) * 100}%`, width: '100%', backgroundColor: '#10b981' }} />}
                         </div>
-                        <span style={{ position: 'absolute', bottom: '-18px', fontSize: '0.62rem', color: '#64748b', whiteSpace: 'nowrap' }}>{tglItem.label}</span>
+                        <span style={{ position: 'absolute', bottom: '-18px', fontSize: '0.62rem', color: '#64748b', whiteSpace: 'nowrap' }}>{tglItem.label.slice(0, 5)}</span>
                       </div>
                     );
                   })}
@@ -460,35 +485,14 @@ export default function DashboardSiswa({ user, onLogout }) {
                     {dataDetailTanggal.length === 0 ? (
                       <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada tanggal ini.</p>
                     ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f8fafc', color: '#475569' }}>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Nama</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Kelas</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Kelamin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Izin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Alasan / Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dataDetailTanggal.map((item, idx) => (
-                            <tr key={idx}>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9', fontWeight: '600' }}>{item.nama_lengkap}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.kelas}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_kelamin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_izin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.alasan || item.keterangan}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <TabelDetail data={dataDetailTanggal} tampilTanggal={false} formatTanggal={normalisasiTanggal} />
                     )}
                   </div>
                 )}
               </div>
 
               {/* GRAFIK JENIS KELAMIN & KELAS */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: '#1e293b' }}>Grafik Jenis Kelamin</h3>
                   {rekapJenisKelamin.length === 0 ? (
@@ -533,11 +537,11 @@ export default function DashboardSiswa({ user, onLogout }) {
               </div>
 
               {/* GRAFIK MINGGUAN */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem 2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: '#1e293b' }}>
                   Grafik Mingguan: {tanggalAwalGrafik} sampai {tanggalAkhirGrafik} (Klik bar hari)
                 </h3>
-                <div style={{ position: 'relative', height: '190px', display: 'flex', alignItems: 'flex-end', gap: '1rem', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 1rem 0.5rem 2.25rem', marginTop: '1rem' }}>
+                <div style={{ position: 'relative', height: '190px', display: 'flex', alignItems: 'flex-end', gap: 'clamp(0.2rem, 1.5vw, 1rem)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 clamp(0.3rem, 2vw, 1rem) 0.5rem', marginTop: '1rem' }}>
                   {rekapMingguan.map((minggu) => {
                     const total = minggu.data.length;
                     const jumlahWarna = hitungWarnaIzin(minggu.data);
@@ -549,7 +553,7 @@ export default function DashboardSiswa({ user, onLogout }) {
                           <div style={{ height: `${total ? (jumlahWarna.izin / total) * 100 : 0}%`, backgroundColor: '#2563eb' }} />
                           <div style={{ height: `${total ? (jumlahWarna.sakit / total) * 100 : 0}%`, backgroundColor: '#16a34a' }} />
                         </div>
-                        <span style={{ marginTop: '8px', fontSize: '0.72rem', color: hariTerpilih === minggu.label ? '#2563eb' : '#64748b', fontWeight: hariTerpilih === minggu.label ? 'bold' : 'normal' }}>{minggu.label}</span>
+                        <span style={{ marginTop: '8px', fontSize: '0.72rem', color: hariTerpilih === minggu.label ? '#2563eb' : '#64748b', fontWeight: hariTerpilih === minggu.label ? 'bold' : 'normal' }} title={minggu.label}>{minggu.label.slice(0, 3)}</span>
                       </div>
                     );
                   })}
@@ -561,51 +565,29 @@ export default function DashboardSiswa({ user, onLogout }) {
                     {dataHariTerpilih.length === 0 ? (
                       <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada hari {hariTerpilih}.</p>
                     ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f8fafc', color: '#475569' }}>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Nama</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Kelas</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Kelamin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Tanggal</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Izin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Alasan / Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dataHariTerpilih.map((item, idx) => (
-                            <tr key={idx}>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9', fontWeight: '600' }}>{item.nama_lengkap}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.kelas}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_kelamin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{normalisasiTanggal(item.tanggal)}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_izin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.alasan || item.keterangan}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <TabelDetail data={dataHariTerpilih} tampilTanggal formatTanggal={normalisasiTanggal} />
                     )}
                   </div>
                 )}
               </div>
 
               {/* GRAFIK BULANAN */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem 2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: '#1e293b' }}>Grafik Bulanan (Klik titik bulan)</h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <svg viewBox="0 0 740 220" width="100%" height="220" role="img" style={{ minWidth: '680px', overflow: 'visible' }}>
+                <div style={{ width: '100%' }}>
+                  <svg viewBox="0 0 740 220" role="img" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                     <line x1="20" y1="40" x2="20" y2="170" stroke="#cbd5e1" />
                     <line x1="20" y1="170" x2="710" y2="170" stroke="#cbd5e1" />
-                    <path d={jalurBulanan} fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={jalurBulanan} fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                     {rekapBulanan.map((bulan) => {
                       const x = 20 + bulan.index * 60;
                       const y = 170 - (bulan.data.length / maxBulanan) * 130;
                       const isSelected = bulanTerpilih === bulan.index;
                       return (
                         <g key={bulan.nama} onClick={() => setBulanTerpilih(isSelected ? null : bulan.index)} style={{ cursor: 'pointer' }}>
-                          <circle cx={x} cy={y} r={isSelected ? "8" : "6"} fill="#f59e0b" stroke={isSelected ? "#2563eb" : "#ffffff"} strokeWidth={isSelected ? "3" : "2"} />
-                          <text x={x} y="195" textAnchor="middle" fontSize="10" fill={isSelected ? "#2563eb" : "#64748b"} fontWeight={isSelected ? "bold" : "normal"}>{bulan.nama.slice(0, 3)}</text>
+                          <circle cx={x} cy={y} r="22" fill="transparent" />
+                          <circle cx={x} cy={y} r={isSelected ? "11" : "8"} fill="#f59e0b" stroke={isSelected ? "#2563eb" : "#ffffff"} strokeWidth={isSelected ? "4" : "3"} />
+                          <text x={x} y="200" textAnchor="middle" fontSize="15" fill={isSelected ? "#2563eb" : "#64748b"} fontWeight={isSelected ? "bold" : "normal"}>{bulan.nama.slice(0, 3)}</text>
                         </g>
                       );
                     })}
@@ -618,30 +600,7 @@ export default function DashboardSiswa({ user, onLogout }) {
                     {dataBulanTerpilih.length === 0 ? (
                       <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada bulan {namaBulan[bulanTerpilih]}.</p>
                     ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f8fafc', color: '#475569' }}>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Nama</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Kelas</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Kelamin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Tanggal</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Jenis Izin</th>
-                            <th style={{ padding: '0.7rem', textAlign: 'left' }}>Alasan / Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dataBulanTerpilih.map((item, idx) => (
-                            <tr key={idx}>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9', fontWeight: '600' }}>{item.nama_lengkap}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.kelas}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_kelamin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{normalisasiTanggal(item.tanggal)}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.jenis_izin}</td>
-                              <td style={{ padding: '0.7rem', borderBottom: '1px solid #f1f5f9' }}>{item.alasan || item.keterangan}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <TabelDetail data={dataBulanTerpilih} tampilTanggal formatTanggal={normalisasiTanggal} />
                     )}
                   </div>
                 )}
@@ -653,27 +612,27 @@ export default function DashboardSiswa({ user, onLogout }) {
               </div>
 
               {/* SEMUA RIWAYAT DENGAN TOMBOL EDIT & HAPUS */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem 2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>Semua Riwayat Pengajuan Izin</h3>
                 {daftarIzin.length === 0 ? (
                   <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '2rem 0' }}>Belum ada data izin yang tersedia.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {daftarIzin.map((item, idx) => (
-                      <div key={item.id_pengajuan || idx} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem 1.25rem', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <div key={item.id_pengajuan || idx} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem 1.25rem', backgroundColor: '#ffffff', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 8px', marginBottom: '6px' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#0f172a' }}>{item.nama_lengkap}</span>
                             <span style={{ backgroundColor: '#f1f5f9', color: '#334155', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{item.kelas}</span>
                             <span style={{ ...gayaBadgeJenisKelamin(item.jenis_kelamin), fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>{item.jenis_kelamin || '-'}</span>
                             <span style={{ backgroundColor: jenisIzinSakit(item.jenis_izin) ? '#dcfce7' : '#dbeafe', color: jenisIzinSakit(item.jenis_izin) ? '#166534' : '#1d4ed8', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>{item.jenis_izin}</span>
                             <span style={{ backgroundColor: statusPengajuan(item.status) === 'Disetujui' ? '#dcfce7' : '#fef3c7', color: statusPengajuan(item.status) === 'Disetujui' ? '#166534' : '#92400e', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>{statusPengajuan(item.status)}</span>
                           </div>
-                          <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px' }}>
                             <span>📅 {normalisasiTanggal(item.tanggal)}</span>
                             <span>⏰ {item.waktu_mulai} - {item.waktu_selesai}</span>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginTop: '4px' }}>"{item.keterangan || item.alasan}"</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginTop: '4px', overflowWrap: 'anywhere' }}>"{item.keterangan || item.alasan}"</div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button onClick={() => handleEdit(item)} style={{ backgroundColor: '#dbeafe', color: '#1e40af', border: 'none', padding: '0.35rem 0.75rem', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>Edit</button>
