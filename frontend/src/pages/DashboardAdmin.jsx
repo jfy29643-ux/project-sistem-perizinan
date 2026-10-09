@@ -22,7 +22,10 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Di HP (<= 850px) sidebar default tertutup supaya tidak menutupi konten
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === "undefined" || window.innerWidth > 850
+  );
   const [roleOpen, setRoleOpen] = useState(false);
   const [activePage, setActivePage] = useState("dashboard");
 
@@ -338,11 +341,32 @@ export default function Dashboard() {
     setCurrentRole(role);
     setRoleOpen(false);
     setActivePage(role.page);
+    if (isMobileScreen()) setSidebarOpen(false);
   };
+
+  const isMobileScreen = () =>
+    typeof window !== "undefined" && window.innerWidth <= 850;
+
+  // Saat layar berubah (rotate HP / resize), sesuaikan sidebar
+  useEffect(() => {
+    let wasMobile = isMobileScreen();
+
+    const handleResize = () => {
+      const nowMobile = isMobileScreen();
+      if (nowMobile !== wasMobile) {
+        setSidebarOpen(!nowMobile);
+        wasMobile = nowMobile;
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleMenu = (page) => {
     setActivePage(page);
     setRoleOpen(false);
+    if (isMobileScreen()) setSidebarOpen(false);
   };
 
   /*
@@ -684,6 +708,23 @@ export default function Dashboard() {
 
         .sidebar-toggle:hover {
           background: #e8edf3;
+        }
+
+        .sidebar-toggle .toggle-dots-icon {
+          display: none;
+          font-size: 28px;
+          font-weight: 800;
+          line-height: 1;
+        }
+
+        .sidebar-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          z-index: 105;
+          border: 0;
+          padding: 0;
+          background: rgba(15, 23, 42, 0.45);
         }
 
         .topbar-title {
@@ -1524,9 +1565,41 @@ export default function Dashboard() {
             width: 270px;
           }
 
+          .dashboard-sidebar {
+            width: min(270px, 85vw);
+            height: 100dvh;
+            bottom: auto;
+            z-index: 110;
+            transform: translateX(0);
+            transition: transform 0.25s ease;
+            box-shadow: 0 0 30px rgba(15, 23, 42, 0.25);
+          }
+
           .dashboard-sidebar.sidebar-closed {
             transform: translateX(-100%);
-            width: 270px;
+            width: min(270px, 85vw);
+            box-shadow: none;
+          }
+
+          /* tombol Keluar tidak ketutup address bar browser HP */
+          .dashboard-sidebar .sidebar-menu {
+            overflow-y: auto;
+          }
+
+          .dashboard-sidebar .sidebar-bottom {
+            padding-bottom: calc(17px + env(safe-area-inset-bottom, 0px));
+          }
+
+          .sidebar-overlay {
+            display: block;
+          }
+
+          .sidebar-toggle .toggle-menu-icon {
+            display: none;
+          }
+
+          .sidebar-toggle .toggle-dots-icon {
+            display: block;
           }
 
           .dashboard-main,
@@ -1623,6 +1696,15 @@ export default function Dashboard() {
         {/* =====================================================
             SIDEBAR
         ===================================================== */}
+
+        {sidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-overlay"
+            aria-label="Tutup menu"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
         <aside
           className={`dashboard-sidebar ${
@@ -1765,13 +1847,15 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="sidebar-toggle"
+                aria-label="Buka / tutup menu"
                 onClick={() =>
                   setSidebarOpen(
                     !sidebarOpen
                   )
                 }
               >
-                <Menu size={22} />
+                <Menu size={22} className="toggle-menu-icon" />
+                <span className="toggle-dots-icon" aria-hidden="true">⋮</span>
               </button>
 
 

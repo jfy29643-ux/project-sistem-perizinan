@@ -161,27 +161,97 @@ export default function DashboardGuruPiket({ user, onLogout }) {
       })
     : [];
 
+  // ============================================================
+  // DOWNLOAD EXCEL
+  // Membuat file Excel (.xls) langsung di browser dari data izin
+  // ============================================================
+  const escapeHtml = (value) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const downloadExcel = () => {
+    if (!daftarIzin.length) {
+      setErrorMessage('Belum ada data izin yang bisa diunduh.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+
+    const kolom = [
+      'No',
+      'Nama Siswa',
+      'Kelas',
+      'Jenis Kelamin',
+      'Jenis Izin',
+      'Tanggal',
+      'Alasan',
+      'Status',
+      'Catatan Verifikasi',
+    ];
+
+    const baris = daftarIzin.map((item, index) => [
+      index + 1,
+      item.nama_lengkap || item.nama || '-',
+      item.kelas || '-',
+      item.jenis_kelamin || '-',
+      item.jenis_izin || '-',
+      formatTanggal(item.tanggal),
+      item.alasan || item.keterangan || '-',
+      item.status || '-',
+      item.catatan_verifikasi || '-',
+    ]);
+
+    const tabelHtml =
+      '<table border="1">' +
+      '<thead><tr>' +
+      kolom.map((k) => `<th style="background:#1769a5;color:#ffffff;">${escapeHtml(k)}</th>`).join('') +
+      '</tr></thead><tbody>' +
+      baris
+        .map((r) => '<tr>' + r.map((c) => `<td>${escapeHtml(c)}</td>`).join('') + '</tr>')
+        .join('') +
+      '</tbody></table>';
+
+    const dokumen =
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+      'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+      'xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="UTF-8">' +
+      '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
+      '<x:Name>Data Izin Siswa</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+      '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
+      '</head><body>' + tabelHtml + '</body></html>';
+
+    // \uFEFF = BOM supaya huruf/karakter Indonesia tampil benar di Excel
+    const blob = new Blob(['\uFEFF' + dokumen], {
+      type: 'application/vnd.ms-excel;charset=utf-8;',
+    });
+
+    const tglFile = new Date().toISOString().split('T')[0];
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `data-izin-siswa-${tglFile}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    setActionMessage('File Excel berhasil diunduh.');
+    setTimeout(() => setActionMessage(''), 4000);
+  };
+
   return (
     <div className="dashboard-guru-container" style={styles.dashboardContainer}>
-      <button 
-        className="mobile-menu-toggle"
+      <button
+        type="button"
+        className="mobile-dots-btn"
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        style={{
-          display: 'none',
-          position: 'fixed',
-          top: '12px',
-          left: '12px',
-          zIndex: 110,
-          padding: '0.5rem 0.75rem',
-          backgroundColor: '#111827',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '0.375rem',
-          fontSize: '0.875rem',
-          cursor: 'pointer'
-        }}
+        aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+        aria-expanded={mobileMenuOpen}
       >
-        {mobileMenuOpen ? 'Tutup Menu' : 'Menu ☰'}
+        ⋮
       </button>
 
       {mobileMenuOpen && (
@@ -239,7 +309,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
         </div>
 
         <div style={styles.sidebarFooter}>
-          <button style={styles.downloadButton}>Download Excel</button>
+          <button type="button" onClick={downloadExcel} style={styles.downloadButton}>Download Excel</button>
           <button onClick={onLogout} style={styles.logoutButton}>Keluar</button>
         </div>
       </div>
@@ -270,8 +340,12 @@ export default function DashboardGuruPiket({ user, onLogout }) {
           <style>{`
             @media screen and (max-width: 768px) {
               .sidebar-guru {
-                left: -260px !important;
+                left: -280px !important;
                 transition: left 0.3s ease-in-out;
+                width: min(260px, 85vw) !important;
+                height: 100dvh !important;
+                overflow-y: auto !important;
+                padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
               }
               .sidebar-guru.sidebar-open {
                 left: 0 !important;
@@ -279,10 +353,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
               .main-content-guru {
                 margin-left: 0 !important;
                 padding: 12px !important;
-                padding-top: 55px !important;
-              }
-              .mobile-menu-toggle {
-                display: block !important;
+                padding-top: 64px !important;
               }
             }
           `}</style>

@@ -9,7 +9,6 @@ const API_BASE_URL = API_URL;
 const ROLE_OPTIONS = [
   { value: 'Siswa', label: 'Siswa' },
   { value: 'Guru', label: 'Guru' },
-  { value: 'Admin', label: 'Admin' },
   { value: 'Satpam', label: 'Satpam' }
 ];
 

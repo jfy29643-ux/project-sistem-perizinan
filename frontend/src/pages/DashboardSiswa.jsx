@@ -303,9 +303,28 @@ export default function DashboardSiswa({ user, onLogout }) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="dashboard-siswa-root" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* TOMBOL TITIK 3 (hanya tampil di mobile) */}
+      <button
+        type="button"
+        className="mobile-dots-btn"
+        onClick={() => setMobileMenuOpen((open) => !open)}
+        aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
+        aria-expanded={mobileMenuOpen}
+      >
+        ⋮
+      </button>
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="mobile-dashboard-overlay"
+          aria-label="Tutup menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <div style={{ width: '260px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', top: 0, left: 0, zIndex: 100, borderRight: '1px solid #e2e8f0' }}>
+      <div className={`dashboard-siswa-sidebar${mobileMenuOpen ? ' sidebar-open' : ''}`} style={{ width: '260px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', top: 0, left: 0, zIndex: 100, borderRight: '1px solid #e2e8f0' }}>
         
         {/* HEADER SIDEBAR DENGAN LOGO SEKOLAH */}
         <div style={{ padding: '1.25rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -321,10 +340,10 @@ export default function DashboardSiswa({ user, onLogout }) {
         </div>
 
         <div style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-          <button onClick={() => { setActiveMenu('pengajuan'); setIsEditing(false); }} style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: activeMenu === 'pengajuan' ? '#2563eb' : 'transparent', color: activeMenu === 'pengajuan' ? '#fff' : '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>
+          <button onClick={() => { setActiveMenu('pengajuan'); setIsEditing(false); setMobileMenuOpen(false); }} style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: activeMenu === 'pengajuan' ? '#2563eb' : 'transparent', color: activeMenu === 'pengajuan' ? '#fff' : '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>
             ➕ Form Pengajuan
           </button>
-          <button onClick={() => setActiveMenu('laporan')} style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: activeMenu === 'laporan' ? '#2563eb' : 'transparent', color: activeMenu === 'laporan' ? '#fff' : '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>
+          <button onClick={() => { setActiveMenu('laporan'); setMobileMenuOpen(false); }} style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: activeMenu === 'laporan' ? '#2563eb' : 'transparent', color: activeMenu === 'laporan' ? '#fff' : '#334155', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>
             📊 Laporan Izin Siswa
           </button>
         </div>
@@ -336,7 +355,7 @@ export default function DashboardSiswa({ user, onLogout }) {
       </div>
 
       {/* KONTEN UTAMA */}
-      <div style={{ marginLeft: '260px', flex: 1, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div className="dashboard-siswa-main" style={{ marginLeft: '260px', flex: 1, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
         <div style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b' }}>Dashboard Siswa - Sistem Perizinan</div>
           <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Login sebagai: <b>{namaAkun}</b></div>

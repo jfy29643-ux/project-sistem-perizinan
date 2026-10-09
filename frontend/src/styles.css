@@ -210,3 +210,47 @@ html, body, #root {
     padding: 16px !important;
   }
 }
+
+/* ======================================================
+   TOMBOL TITIK 3 (⋮) UNTUK MOBILE - dipakai Siswa & Guru
+   ====================================================== */
+.mobile-dots-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-dots-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 90;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #1e293b;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-dots-btn:active {
+    background: #f1f5f9;
+  }
+
+  /* Sidebar siswa: tinggi mengikuti layar HP sebenarnya (bukan 100vh),
+     supaya tombol "Keluar Akun" tidak ketutup address bar browser */
+  .dashboard-siswa-sidebar {
+    height: 100dvh !important;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
