@@ -9,7 +9,7 @@ const isLocalhost =
 
 const alamat = isLocalhost
   ? 'http://localhost:5001'
-  : import.meta.env.VITE_API_URL || 'https://pengajuan-smkn-compreng-api.vercel.app';
+  : import.meta.env.VITE_API_URL || 'https://project-sistem-perizinan.vercel.app';
 
 // hapus tanda "/" di akhir supaya tidak jadi "//"
 export const API_URL = alamat.replace(/\/+$/, '');

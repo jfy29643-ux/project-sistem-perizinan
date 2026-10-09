@@ -27,6 +27,7 @@ const isAllowedOrigin = (origin) => {
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
     // frontend resmi + preview deployment milik project yang sama
     if (/^https:\/\/pengajuan-smkn-compreng(-[a-z0-9-]+)?\.vercel\.app$/i.test(origin)) return true;
+    if (/^https:\/\/project-sistem-perizinan[a-z0-9-]*\.vercel\.app$/i.test(origin)) return true;
     return extraOrigins.includes(origin);
 };
 
