@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 
 // ======================================================
 // URL API OTOMATIS
-// - Dibuka di localhost  -> auth backend di http://localhost:5001 (TIDAK DIUBAH)
+// - Dibuka di localhost  -> auth backend di http://localhost:5001
 // - Dibuka di Vercel     -> langsung mengarah ke backend auth Vercel Anda
 // ======================================================
-const isLocalhost = ['localhost', '127.0.0.1'].includes(
+const isLocalhost = ['localhost', '127.0.0.1', ''].includes(
   window.location.hostname
 );
 
 const API_BASE_URL = isLocalhost
   ? 'http://localhost:5001'
-  : (import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || 'https://project-sistem-perizinan-auth-servi.vercel.app');
+  : (import.meta.env.VITE_AUTH_API_URL || 'https://sistem-izin-bc-auth-naplihah.vercel.app');
 
 // ======================================================
 // PILIHAN ROLE

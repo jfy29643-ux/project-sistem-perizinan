@@ -1,0 +1,31 @@
+# Dependensi (Folder besar yang harus diabaikan)
+node_modules/
+**/node_modules/
+
+# File Environment / Konfigurasi Sensitif
+.env
+*/.env
+*/*/.env
+
+# Hasil Build / Output Frontend & Backend
+dist/
+build/
+.output/
+
+# File Arsip / Compressed Files
+*.zip
+*.rar
+*.tar
+*.gz
+
+# Log files dan Cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Prisma / Database Lokal (jika ada)
+*.db
+*.db-journal
