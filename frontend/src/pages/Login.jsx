@@ -1,17 +1,7 @@
 import React, { useState } from 'react';
+import { API_URL } from './apiConfig';
 
-// ======================================================
-// URL API OTOMATIS
-// - Dibuka di localhost  -> auth backend di http://localhost:5001
-// - Dibuka di Vercel     -> langsung mengarah ke backend auth Vercel Anda
-// ======================================================
-const isLocalhost = ['localhost', '127.0.0.1', ''].includes(
-  window.location.hostname
-);
-
-const API_BASE_URL = isLocalhost
-  ? 'http://localhost:5001'
-  : (import.meta.env.VITE_AUTH_API_URL || 'https://sistem-izin-bc-auth-naplihah.vercel.app');
+const API_BASE_URL = API_URL;
 
 // ======================================================
 // PILIHAN ROLE
@@ -176,7 +166,11 @@ export default function Login({ onLoginSuccess }) {
         peran: activeRole
       };
 
-      localStorage.setItem('token', result.token || 'dummy-jwt-token');
+      if (!result.token) {
+        throw new Error('Server tidak mengirim token login. Hubungi admin.');
+      }
+
+      localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(sessionUser));
       localStorage.setItem('activeRole', activeRole);
 

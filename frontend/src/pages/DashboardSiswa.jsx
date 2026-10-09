@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL, authFetch } from './apiConfig';
 
 export default function DashboardSiswa({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('laporan');
@@ -54,7 +55,7 @@ export default function DashboardSiswa({ user, onLogout }) {
   const ambilDataIzin = async () => {
     try {
       setLoadingData(true);
-      const response = await fetch('http://localhost:5001/pengajuan');
+      const response = await authFetch(`${API_URL}/pengajuan`);
       const result = await response.json();
       if (Array.isArray(result)) {
         setDaftarIzin(result);
@@ -101,15 +102,15 @@ export default function DashboardSiswa({ user, onLogout }) {
     };
 
     try {
-      let url = 'http://localhost:5001/pengajuan';
+      let url = `${API_URL}/pengajuan`;
       let method = 'POST';
 
       if (isEditing && idYangDiedit) {
-        url = `http://localhost:5001/pengajuan/${idYangDiedit}`;
+        url = `${API_URL}/pengajuan/${idYangDiedit}`;
         method = 'PUT';
       }
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataPayload),
@@ -162,7 +163,7 @@ export default function DashboardSiswa({ user, onLogout }) {
   const handleHapus = async (id) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus data ini?')) {
       try {
-        const response = await fetch(`http://localhost:5001/pengajuan/${id}`, {
+        const response = await authFetch(`${API_URL}/pengajuan/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {

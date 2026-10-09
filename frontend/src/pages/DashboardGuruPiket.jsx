@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL, authFetch } from './apiConfig';
 
 const getSiswaUnik = (dataArray) => {
   const mapData = {};
@@ -33,7 +34,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
     setLoading(true);
     setErrorMessage('');
     try {
-      const response = await fetch('http://localhost:5001/pengajuan');
+      const response = await authFetch(`${API_URL}/pengajuan`);
       const result = await response.json();
       
       if (response.ok) {
@@ -62,7 +63,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
     const catatanVerifikasi = status === 'Disetujui' ? 'Disetujui oleh Guru Piket' : 'Ditolak oleh Guru Piket';
 
     try {
-      const response = await fetch(`http://localhost:5001/verifikasi-pengajuan/${idItem}/status`, {
+      const response = await authFetch(`${API_URL}/verifikasi-pengajuan/${idItem}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

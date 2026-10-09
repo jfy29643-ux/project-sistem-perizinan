@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
+import { PENGAJUAN_API_URL as API_URL, authFetch } from './apiConfig';
 import {
   LayoutDashboard,
   Users,
@@ -156,7 +156,7 @@ export default function Dashboard() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_URL}/pengajuan`);
+      const response = await authFetch(`${API_URL}/pengajuan`);
 
       if (!response.ok) {
         throw new Error(

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { PENGAJUAN_API_URL as API_URL } from './apiConfig';
+import { PENGAJUAN_API_URL as API_URL, authFetch } from './apiConfig';
 
 const getDateOnly = (value) => {
   if (!value) return '';
@@ -111,6 +111,13 @@ const getStatusVerifikasiSatpam = (item) => {
   return '';
 };
 
+const getStatusVerifikasiGuru = (item) => {
+  const catatan = String(item?.catatan_verifikasi || '').toLowerCase();
+  if (catatan.includes('ditolak oleh guru')) return 'Ditolak';
+  if (catatan.includes('disetujui oleh guru')) return 'Disetujui';
+  return '';
+};
+
 export default function DashboardSatpam({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('verifikasi');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -127,6 +134,12 @@ export default function DashboardSatpam({ user, onLogout }) {
   const [selectedMonthlyIndex, setSelectedMonthlyIndex] = useState(null);
   const [notifikasiSatpam, setNotifikasiSatpam] = useState([]);
   const [tanggalSekarang, setTanggalSekarang] = useState(() => new Date());
+  // Menyimpan notifikasi yang sudah pernah tampil supaya tidak muncul berulang
+  const notifSudahTampilRef = useRef(new Set());
+
+  useEffect(() => {
+    notifikasiSatpam.forEach((n) => notifSudahTampilRef.current.add(n.id));
+  }, [notifikasiSatpam]);
 
   useEffect(() => {
     const interval = setInterval(() => setTanggalSekarang(new Date()), 60000);
@@ -151,7 +164,7 @@ export default function DashboardSatpam({ user, onLogout }) {
   const fetchPengajuan = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/pengajuan?role=satpam`);
+      const response = await authFetch(`${API_URL}/pengajuan?role=satpam`);
       const result = await response.json();
 
       if (response.ok && result.success) {
@@ -176,16 +189,11 @@ export default function DashboardSatpam({ user, onLogout }) {
 
     const cekNotifikasiSatpam = async () => {
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `${API_URL}/notifikasi?role=satpam&_notif=${Date.now()}`,
           {
             method: 'GET',
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
+            cache: 'no-store'
           }
         );
 
@@ -210,7 +218,7 @@ export default function DashboardSatpam({ user, onLogout }) {
                 };
               })
               .filter((item) => {
-                if (existingIds.has(item.id)) return false;
+                if (existingIds.has(item.id) || notifSudahTampilRef.current.has(item.id)) return false;
                 
                 // CEK KETAT: Jika pengajuan ini sudah disetujui/ditolak oleh satpam di tabel, jangan tampilkan notif!
                 if (item.id_pengajuan) {
@@ -242,8 +250,8 @@ export default function DashboardSatpam({ user, onLogout }) {
     // Panggil fetch pertama kali
     cekNotifikasiSatpam();
 
-    // Cek berkala setiap 2 detik
-    const interval = setInterval(cekNotifikasiSatpam, 2000);
+    // Cek berkala setiap 5 detik
+    const interval = setInterval(cekNotifikasiSatpam, 5000);
 
     return () => {
       aktif = false;
@@ -272,7 +280,7 @@ export default function DashboardSatpam({ user, onLogout }) {
     const idSatpamAktif = user?.id_satpam || user?.id_pengguna || user?.id || null;
 
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${API_URL}/pengajuan/${selectedItem.id_pengajuan}/verifikasi`,
         {
           method: 'POST',
@@ -764,6 +772,7 @@ export default function DashboardSatpam({ user, onLogout }) {
                       dataIzin.map((row) => {
                         const statusSatpam = getStatusVerifikasiSatpam(row);
                         const sudahDiverifikasiSatpam = Boolean(statusSatpam);
+                        const statusGuru = getStatusVerifikasiGuru(row);
 
                         return (
                           <tr key={row.id_pengajuan} style={styles.trBody}>
@@ -785,7 +794,7 @@ export default function DashboardSatpam({ user, onLogout }) {
                                 ) : (
                                   <span style={styles.badgeDanger}>Ditolak</span>
                                 )
-                              ) : (
+                              ) : statusGuru === 'Disetujui' ? (
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                   <button onClick={() => handleOpenModal(row, 'setuju')} style={styles.btnSetuju}>
                                     Setujui
@@ -794,6 +803,12 @@ export default function DashboardSatpam({ user, onLogout }) {
                                     Tolak
                                   </button>
                                 </div>
+                              ) : statusGuru === 'Ditolak' ? (
+                                <span style={styles.badgeDanger}>Ditolak Guru Piket</span>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                                  Menunggu Guru Piket
+                                </span>
                               )}
                             </td>
                           </tr>
