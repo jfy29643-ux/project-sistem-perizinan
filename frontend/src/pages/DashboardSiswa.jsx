@@ -197,7 +197,12 @@ export default function DashboardSiswa({ user, onLogout }) {
           );
           alert('Data berhasil dihapus!');
         } else {
-          alert('Gagal menghapus data dari database.');
+          let pesan = 'Gagal menghapus data dari database.';
+          try {
+            const hasil = await response.json();
+            if (hasil && hasil.message) pesan = hasil.message;
+          } catch (e) { /* abaikan, pakai pesan umum */ }
+          alert(pesan);
         }
       } catch (error) {
         console.error('Error hapus:', error);

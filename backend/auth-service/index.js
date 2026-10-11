@@ -340,8 +340,6 @@ const KOLOM_SISWA = [
 ];
 const KOLOM_ADMIN = [...KOLOM_SISWA, 'status', 'catatan_verifikasi'];
 
-const statusMenunggu = (row) => String(row?.status || 'menunggu').toLowerCase().includes('menunggu');
-
 const milikSiswa = (row, user) =>
     String(row.id_pengguna) === String(user.sub) ||
     (row.nama_lengkap &&
@@ -432,10 +430,6 @@ const ambilPengajuanMilikSiswa = async (req, res) => {
             fail(res, 403, 'Anda hanya dapat mengubah pengajuan milik sendiri.');
             return null;
         }
-        if (!statusMenunggu(row)) {
-            fail(res, 409, 'Pengajuan yang sudah diverifikasi tidak dapat diubah atau dihapus.');
-            return null;
-        }
     }
     return row;
 };
@@ -470,6 +464,16 @@ app.delete('/pengajuan/:id', wajibPeran('siswa'), async (req, res) => {
     try {
         const row = await ambilPengajuanMilikSiswa(req, res);
         if (!row) return;
+
+        // Hapus dulu data turunan yang mengacu ke pengajuan ini (verifikasi guru, verifikasi satpam,
+        // pencatatan keluar), supaya penghapusan tidak ditolak oleh relasi antar tabel.
+        for (const tabel of ['pencatatan_keluar', 'verifikasi_izin', 'verifikasi_pengajuan']) {
+            const { error: errAnak } = await supabase
+                .from(tabel)
+                .delete()
+                .eq('id_pengajuan', req.params.id);
+            if (errAnak) console.error(`Gagal membersihkan ${tabel}:`, errAnak.message);
+        }
 
         const { data, error } = await supabase
             .from('pengajuan_izin')
