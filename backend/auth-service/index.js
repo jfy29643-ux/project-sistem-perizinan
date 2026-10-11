@@ -493,10 +493,11 @@ app.delete('/pengajuan/:id', wajibPeran('siswa'), async (req, res) => {
 // 2. VERIFIKASI SATPAM (dipakai DashboardSatpam)
 // ======================================================
 // Satpam menyetujui / menolak pengajuan yang sudah diverifikasi Guru Piket.
-// Setiap keputusan Satpam disimpan ke 3 tempat:
+// Setiap keputusan Satpam disimpan ke 4 tempat:
 //   1. verifikasi_izin     -> hasil verifikasi Satpam
 //   2. pencatatan_keluar_masuk -> catatan keluar yang muncul setelah verifikasi_izin terisi
-//   3. pengajuan_izin      -> status & catatan (dipakai tampilan dashboard)
+//   3. detail_rekap        -> jumlah pengajuan izin siswa
+//   4. pengajuan_izin      -> status & catatan (dipakai tampilan dashboard)
 // Supabase tidak punya transaksi, jadi kalau satu langkah gagal, langkah sebelumnya dibatalkan.
 //
 // true  = pencatatan_keluar_masuk diisi untuk SETIAP verifikasi (Disetujui maupun Ditolak)
@@ -505,6 +506,63 @@ const CATAT_KELUAR_UNTUK_SEMUA_VERIFIKASI = true;
 
 // Nama tabel pencatatan di Supabase
 const TABEL_PENCATATAN = 'pencatatan_keluar_masuk';
+
+// ------------------------------------------------------------------
+// detail_rekap: mencatat jumlah pengajuan izin setiap siswa.
+// jumlah_izin dihitung ulang dari tabel pengajuan_izin (bukan ditambah +1),
+// jadi kalau dipanggil berkali-kali hasilnya tetap benar dan tidak dobel.
+//  - siswa sudah punya baris di detail_rekap -> jumlah_izin diperbarui
+//  - belum punya baris                      -> baris baru dibuat, id_rekap memakai
+//                                              rekap terbaru di rekap_izin_keluar
+// ------------------------------------------------------------------
+const perbaruiDetailRekap = async (idSiswa) => {
+    try {
+        const { count, error: errHitung } = await supabase
+            .from('pengajuan_izin')
+            .select('id_pengajuan', { count: 'exact', head: true })
+            .eq('id_pengguna', idSiswa);
+        if (errHitung) return { ok: false, pesan: errHitung.message, err: errHitung };
+
+        const jumlah = count || 0;
+
+        const { data: ada, error: errAda } = await supabase
+            .from('detail_rekap')
+            .select('id_detail, id_rekap')
+            .eq('id_siswa', idSiswa)
+            .order('id_detail', { ascending: true })
+            .limit(1);
+        if (errAda) return { ok: false, pesan: errAda.message, err: errAda };
+
+        if (ada && ada.length > 0) {
+            const { data, error } = await supabase
+                .from('detail_rekap')
+                .update({ jumlah_izin: jumlah })
+                .eq('id_detail', ada[0].id_detail)
+                .select();
+            if (error) return { ok: false, pesan: error.message, err: error };
+            return { ok: true, data };
+        }
+
+        const { data: rekap, error: errRekap } = await supabase
+            .from('rekap_izin_keluar')
+            .select('id_rekap')
+            .order('id_rekap', { ascending: false })
+            .limit(1);
+        if (errRekap) return { ok: false, pesan: errRekap.message, err: errRekap };
+        if (!rekap || rekap.length === 0) {
+            return { ok: false, pesan: 'tabel rekap_izin_keluar masih kosong, belum ada id_rekap yang bisa dipakai.' };
+        }
+
+        const { data, error } = await supabase
+            .from('detail_rekap')
+            .insert([{ id_rekap: rekap[0].id_rekap, id_siswa: idSiswa, jumlah_izin: jumlah }])
+            .select();
+        if (error) return { ok: false, pesan: error.message, err: error };
+        return { ok: true, data };
+    } catch (err) {
+        return { ok: false, pesan: err.message || String(err), err };
+    }
+};
 
 app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => {
     let idVerifikasi = null;
@@ -604,7 +662,14 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
             idPencatatan = catatData[0]?.id_pencatatan ?? null;
         }
 
-        // 3. pengajuan_izin (status & catatan untuk tampilan dashboard)
+        // 3. detail_rekap (jumlah pengajuan izin siswa)
+        const hasilRekap = await perbaruiDetailRekap(row.id_pengguna);
+        if (!hasilRekap.ok) {
+            await batalkan();
+            return fail(res, 400, `Gagal menyimpan ke tabel detail_rekap: ${hasilRekap.pesan}`, hasilRekap.err);
+        }
+
+        // 4. pengajuan_izin (status & catatan untuk tampilan dashboard)
         const { data, error } = await supabase
             .from('pengajuan_izin')
             .update({ status, catatan_verifikasi: catatan })
@@ -621,7 +686,8 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
             message: 'Verifikasi Satpam berhasil disimpan',
             data,
             verifikasi_izin: verifData,
-            pencatatan_keluar_masuk: catatData
+            pencatatan_keluar_masuk: catatData,
+            detail_rekap: hasilRekap.data
         });
     } catch (err) {
         await batalkan().catch(() => {});
