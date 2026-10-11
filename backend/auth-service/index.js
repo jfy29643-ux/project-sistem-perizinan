@@ -467,7 +467,7 @@ app.delete('/pengajuan/:id', wajibPeran('siswa'), async (req, res) => {
 
         // Hapus dulu data turunan yang mengacu ke pengajuan ini (verifikasi guru, verifikasi satpam,
         // pencatatan keluar), supaya penghapusan tidak ditolak oleh relasi antar tabel.
-        for (const tabel of ['pencatatan_keluar', 'verifikasi_izin', 'verifikasi_pengajuan']) {
+        for (const tabel of [TABEL_PENCATATAN, 'verifikasi_izin', 'verifikasi_pengajuan']) {
             const { error: errAnak } = await supabase
                 .from(tabel)
                 .delete()
@@ -495,13 +495,16 @@ app.delete('/pengajuan/:id', wajibPeran('siswa'), async (req, res) => {
 // Satpam menyetujui / menolak pengajuan yang sudah diverifikasi Guru Piket.
 // Setiap keputusan Satpam disimpan ke 3 tempat:
 //   1. verifikasi_izin     -> hasil verifikasi Satpam
-//   2. pencatatan_keluar   -> catatan keluar yang muncul setelah verifikasi_izin terisi
+//   2. pencatatan_keluar_masuk -> catatan keluar yang muncul setelah verifikasi_izin terisi
 //   3. pengajuan_izin      -> status & catatan (dipakai tampilan dashboard)
 // Supabase tidak punya transaksi, jadi kalau satu langkah gagal, langkah sebelumnya dibatalkan.
 //
-// true  = pencatatan_keluar diisi untuk SETIAP verifikasi (Disetujui maupun Ditolak)
-// false = pencatatan_keluar hanya diisi kalau Satpam menyetujui
+// true  = pencatatan_keluar_masuk diisi untuk SETIAP verifikasi (Disetujui maupun Ditolak)
+// false = pencatatan_keluar_masuk hanya diisi kalau Satpam menyetujui
 const CATAT_KELUAR_UNTUK_SEMUA_VERIFIKASI = true;
+
+// Nama tabel pencatatan di Supabase
+const TABEL_PENCATATAN = 'pencatatan_keluar_masuk';
 
 app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => {
     let idVerifikasi = null;
@@ -510,7 +513,7 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
     // Batalkan data yang sudah terlanjur masuk bila ada langkah yang gagal
     const batalkan = async () => {
         if (idPencatatan !== null) {
-            await supabase.from('pencatatan_keluar').delete().eq('id_pencatatan', idPencatatan);
+            await supabase.from(TABEL_PENCATATAN).delete().eq('id_pencatatan', idPencatatan);
         }
         if (idVerifikasi !== null) {
             await supabase.from('verifikasi_izin').delete().eq('id_verifikasi_izin', idVerifikasi);
@@ -576,14 +579,14 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
             }])
             .select();
 
-        if (errVerif) return fail(res, 400, 'Gagal menyimpan ke tabel verifikasi_izin.', errVerif);
+        if (errVerif) return fail(res, 400, `Gagal menyimpan ke tabel verifikasi_izin: ${errVerif.message}`, errVerif);
         idVerifikasi = verifData?.[0]?.id_verifikasi_izin ?? null;
 
         // 2. pencatatan_keluar
         let catatData = [];
         if (CATAT_KELUAR_UNTUK_SEMUA_VERIFIKASI || status === 'Disetujui') {
             const { data: hasilCatat, error: errCatat } = await supabase
-                .from('pencatatan_keluar')
+                .from(TABEL_PENCATATAN)
                 .insert([{
                     id_pengajuan: idPengajuan,
                     id_satpam: idSatpam,
@@ -595,7 +598,7 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
 
             if (errCatat) {
                 await batalkan();
-                return fail(res, 400, 'Gagal menyimpan ke tabel pencatatan_keluar.', errCatat);
+                return fail(res, 400, `Gagal menyimpan ke tabel ${TABEL_PENCATATAN}: ${errCatat.message}`, errCatat);
             }
             catatData = hasilCatat || [];
             idPencatatan = catatData[0]?.id_pencatatan ?? null;
@@ -618,7 +621,7 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
             message: 'Verifikasi Satpam berhasil disimpan',
             data,
             verifikasi_izin: verifData,
-            pencatatan_keluar: catatData
+            pencatatan_keluar_masuk: catatData
         });
     } catch (err) {
         await batalkan().catch(() => {});
