@@ -488,8 +488,31 @@ app.delete('/pengajuan/:id', wajibPeran('siswa'), async (req, res) => {
 // ======================================================
 // 2. VERIFIKASI SATPAM (dipakai DashboardSatpam)
 // ======================================================
-// Satpam menyetujui / menolak pengajuan yang sudah diverifikasi Guru Piket
+// Satpam menyetujui / menolak pengajuan yang sudah diverifikasi Guru Piket.
+// Setiap keputusan Satpam disimpan ke 3 tempat:
+//   1. verifikasi_izin     -> hasil verifikasi Satpam
+//   2. pencatatan_keluar   -> catatan keluar yang muncul setelah verifikasi_izin terisi
+//   3. pengajuan_izin      -> status & catatan (dipakai tampilan dashboard)
+// Supabase tidak punya transaksi, jadi kalau satu langkah gagal, langkah sebelumnya dibatalkan.
+//
+// true  = pencatatan_keluar diisi untuk SETIAP verifikasi (Disetujui maupun Ditolak)
+// false = pencatatan_keluar hanya diisi kalau Satpam menyetujui
+const CATAT_KELUAR_UNTUK_SEMUA_VERIFIKASI = true;
+
 app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => {
+    let idVerifikasi = null;
+    let idPencatatan = null;
+
+    // Batalkan data yang sudah terlanjur masuk bila ada langkah yang gagal
+    const batalkan = async () => {
+        if (idPencatatan !== null) {
+            await supabase.from('pencatatan_keluar').delete().eq('id_pencatatan', idPencatatan);
+        }
+        if (idVerifikasi !== null) {
+            await supabase.from('verifikasi_izin').delete().eq('id_verifikasi_izin', idVerifikasi);
+        }
+    };
+
     try {
         const statusMentah = String((req.body || {}).status || '').toLowerCase();
         let status = '';
@@ -498,10 +521,15 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
 
         if (!status) return fail(res, 400, 'Status harus "Disetujui" atau "Ditolak".');
 
+        const idPengajuan = Number(req.params.id);
+        if (!Number.isInteger(idPengajuan) || idPengajuan <= 0) {
+            return fail(res, 400, 'ID pengajuan tidak valid.');
+        }
+
         const { data: row, error: errBaca } = await supabase
             .from('pengajuan_izin')
             .select('*')
-            .eq('id_pengajuan', req.params.id)
+            .eq('id_pengajuan', idPengajuan)
             .maybeSingle();
 
         if (errBaca) return fail(res, 500, 'Gagal membaca data pengajuan.', errBaca);
@@ -515,18 +543,81 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
             return fail(res, 409, 'Pengajuan belum disetujui oleh Guru Piket.');
         }
 
-        const catatan = status === 'Disetujui' ? 'Disetujui oleh Satpam' : 'Ditolak oleh Satpam';
+        // Cegah dobel catatan kalau verifikasi_izin sudah punya data untuk pengajuan ini
+        const { data: sudahAda, error: errCek } = await supabase
+            .from('verifikasi_izin')
+            .select('id_verifikasi_izin')
+            .eq('id_pengajuan', idPengajuan)
+            .limit(1);
 
+        if (errCek) return fail(res, 500, 'Gagal memeriksa data verifikasi_izin.', errCek);
+        if (sudahAda && sudahAda.length > 0) {
+            return fail(res, 409, 'Pengajuan ini sudah diverifikasi oleh Satpam.');
+        }
+
+        const catatan = status === 'Disetujui' ? 'Disetujui oleh Satpam' : 'Ditolak oleh Satpam';
+        const sekarang = new Date().toISOString();
+        // id satpam diambil dari token login, bukan dari kiriman browser
+        const idSatpam = Number(req.user.sub) || null;
+
+        // 1. verifikasi_izin
+        const { data: verifData, error: errVerif } = await supabase
+            .from('verifikasi_izin')
+            .insert([{
+                id_pengajuan: idPengajuan,
+                id_satpam: idSatpam,
+                status_verifikasi: status,
+                tanggal_verifikasi: sekarang,
+                catatan
+            }])
+            .select();
+
+        if (errVerif) return fail(res, 400, 'Gagal menyimpan ke tabel verifikasi_izin.', errVerif);
+        idVerifikasi = verifData?.[0]?.id_verifikasi_izin ?? null;
+
+        // 2. pencatatan_keluar
+        let catatData = [];
+        if (CATAT_KELUAR_UNTUK_SEMUA_VERIFIKASI || status === 'Disetujui') {
+            const { data: hasilCatat, error: errCatat } = await supabase
+                .from('pencatatan_keluar')
+                .insert([{
+                    id_pengajuan: idPengajuan,
+                    id_satpam: idSatpam,
+                    jenis: 'Keluar',
+                    waktu: sekarang,
+                    keterangan: `${row.nama_lengkap || 'Siswa'} (${row.kelas || '-'}) - ${row.jenis_izin || 'Izin'}: ${catatan}`
+                }])
+                .select();
+
+            if (errCatat) {
+                await batalkan();
+                return fail(res, 400, 'Gagal menyimpan ke tabel pencatatan_keluar.', errCatat);
+            }
+            catatData = hasilCatat || [];
+            idPencatatan = catatData[0]?.id_pencatatan ?? null;
+        }
+
+        // 3. pengajuan_izin (status & catatan untuk tampilan dashboard)
         const { data, error } = await supabase
             .from('pengajuan_izin')
             .update({ status, catatan_verifikasi: catatan })
-            .eq('id_pengajuan', req.params.id)
+            .eq('id_pengajuan', idPengajuan)
             .select();
 
-        if (error) return fail(res, 400, 'Gagal menyimpan verifikasi Satpam.', error);
+        if (error) {
+            await batalkan();
+            return fail(res, 400, 'Gagal menyimpan verifikasi Satpam.', error);
+        }
 
-        return ok(res, { success: true, message: 'Verifikasi Satpam berhasil disimpan', data });
+        return ok(res, {
+            success: true,
+            message: 'Verifikasi Satpam berhasil disimpan',
+            data,
+            verifikasi_izin: verifData,
+            pencatatan_keluar: catatData
+        });
     } catch (err) {
+        await batalkan().catch(() => {});
         return fail(res, 500, 'Terjadi kesalahan pada server.', err);
     }
 });

@@ -31,3 +31,25 @@ model VerifikasiPengajuan {
 
   @@map("verifikasi_pengajuan")
 }
+
+model VerifikasiIzin {
+  id_verifikasi_izin Int       @id @default(autoincrement())
+  id_pengajuan       Int
+  id_satpam          Int?
+  status_verifikasi  String?   @db.VarChar(50)
+  tanggal_verifikasi DateTime? @db.Timestamp
+  catatan            String?
+
+  @@map("verifikasi_izin")
+}
+
+model PencatatanKeluar {
+  id_pencatatan Int       @id @default(autoincrement())
+  id_pengajuan  Int
+  id_satpam     Int?
+  jenis         String?   @db.VarChar(50)
+  waktu         DateTime? @db.Timestamp
+  keterangan    String?
+
+  @@map("pencatatan_keluar")
+}

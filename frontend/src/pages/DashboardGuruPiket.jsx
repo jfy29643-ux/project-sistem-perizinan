@@ -1,67 +1,322 @@
 import React, { useState, useEffect } from 'react';
-import Chart from 'chart.js/auto';
 import { API_URL, authFetch } from './apiConfig';
 
-const HARI_LABEL = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-const BULAN_SINGKAT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const BULAN_PENUH = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-];
+const sel = { padding: '0.7rem', borderBottom: '1px solid #f1f5f9', textAlign: 'left' };
 
-const getDateOnly = (value) => (value ? String(value).split('T')[0] : '');
+function TabelDetail({ data, tampilTanggal, formatTanggal }) {
+  return (
+    <div className="rt-wrap" style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', maxHeight: '360px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+      <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: tampilTanggal ? '640px' : '560px' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8fafc', color: '#475569' }}>
+            {['Nama', 'Kelas', 'Jenis Kelamin', ...(tampilTanggal ? ['Tanggal'] : []), 'Jenis Izin', 'Alasan / Keterangan'].map((judul) => (
+              <th key={judul} style={{ padding: '0.7rem', textAlign: 'left', position: 'sticky', top: 0, backgroundColor: '#f8fafc', whiteSpace: 'nowrap' }}>{judul}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item, idx) => (
+            <tr key={item.id_pengajuan || item.id || idx}>
+              <td data-label="Nama" style={{ ...sel, fontWeight: '600' }}>{item.nama_lengkap}</td>
+              <td data-label="Kelas" style={sel}>{item.kelas}</td>
+              <td data-label="Jenis Kelamin" style={sel}>{item.jenis_kelamin}</td>
+              {tampilTanggal && <td data-label="Tanggal" style={sel}>{formatTanggal(item.tanggal)}</td>}
+              <td data-label="Jenis Izin" style={sel}>{item.jenis_izin}</td>
+              <td data-label="Alasan" style={sel}>{item.alasan || item.keterangan}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-const toYMD = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Grafik statistik yang SAMA PERSIS dengan Dashboard Siswa (tanpa riwayat izin).
+// Dipakai oleh Dashboard Guru Piket dan Dashboard Satpam.
+function GrafikStatistik({ daftarIzin = [] }) {
+  const [tanggalTerpilih, setTanggalTerpilih] = useState('');
+  const [hariTerpilih, setHariTerpilih] = useState('');
+  const [bulanTerpilih, setBulanTerpilih] = useState(null);
+  const [bulanGrafik] = useState('');
+  const [waktuSekarang] = useState(() => new Date());
 
-const isSakit = (item) => String(item?.jenis_izin || '').toLowerCase().includes('sakit');
-
-// 0 = Senin ... 6 = Minggu (-1 kalau tanggal tidak valid)
-const getIndexHari = (value) => {
-  const tgl = getDateOnly(value);
-  if (!tgl) return -1;
-  const d = new Date(`${tgl}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return -1;
-  const i = d.getDay();
-  return i === 0 ? 6 : i - 1;
-};
-
-// Kelompokkan per siswa. Dipakai untuk tabel detail grafik.
-// perTanggal = true  -> 1 baris per siswa per tanggal (grafik tanggal & mingguan)
-// perTanggal = false -> 1 baris per siswa (grafik bulanan)
-const kelompokkanSiswa = (list, perTanggal = true) => {
-  const map = {};
-  (list || []).forEach((item) => {
-    const nama = item.nama_lengkap || item.nama || 'Tanpa Nama';
-    const kelas = item.kelas || '-';
-    const tgl = getDateOnly(item.tanggal);
-    const key = perTanggal ? `${nama}_${kelas}_${tgl}` : `${nama}_${kelas}`;
-    const alasan = item.alasan || item.keterangan || item.jenis_izin || '-';
-    const jenis = isSakit(item) ? 'Sakit' : 'Izin';
-
-    if (!map[key]) {
-      map[key] = {
-        nama,
-        kelas,
-        jenis_kelamin: item.jenis_kelamin || '-',
-        tanggal: tgl,
-        total_izin: 0,
-        alasan_list: [],
-        jenis_list: [],
-      };
+  function normalisasiTanggal(nilai) {
+    if (!nilai) return '';
+    const str = String(nilai).trim();
+    if (str.includes('T')) {
+      return str.split('T')[0];
     }
-    const row = map[key];
-    row.total_izin += 1;
-    if (!row.alasan_list.includes(alasan)) row.alasan_list.push(alasan);
-    if (!row.jenis_list.includes(jenis)) row.jenis_list.push(jenis);
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const tahun = d.getFullYear();
+      const bulan = String(d.getMonth() + 1).padStart(2, '0');
+      const hari = String(d.getDate()).padStart(2, '0');
+      return `${tahun}-${bulan}-${hari}`;
+    }
+    return str.split('T')[0];
+  }
+
+  // Grafik Tanggal dengan urutan dari tanggal 07 di kiri sampai 01 di kanan
+  const getDaftarTanggalDariData = () => {
+    const tahun = waktuSekarang.getFullYear();
+    const bulan = String(waktuSekarang.getMonth() + 1).padStart(2, '0');
+    
+    // Menggunakan (7 - index) agar urutannya mundur dari 07 ke 01
+    return Array.from({ length: 7 }, (_, index) => {
+      const hariVal = 7 - index; // 7, 6, 5, 4, 3, 2, 1
+      const hari = String(hariVal).padStart(2, '0');
+      const full = `${tahun}-${bulan}-${hari}`;
+      const label = `${hari}/${bulan}/${tahun}`;
+      return { full, label };
+    });
+  };
+
+  const daftarTanggalGrafik = getDaftarTanggalDariData();
+
+  const hitungIzinPerTanggal = (tanggalTarget) => {
+    const tglNormTarget = normalisasiTanggal(tanggalTarget);
+    return daftarIzin.filter((item) => normalisasiTanggal(item.tanggal) === tglNormTarget).length;
+  };
+
+  const jenisIzinSakit = (jenis) => String(jenis || '').trim().toLowerCase().includes('sakit');
+  const hitungWarnaIzin = (data) => ({
+    sakit: data.filter((item) => jenisIzinSakit(item.jenis_izin)).length,
+    izin: data.filter((item) => !jenisIzinSakit(item.jenis_izin)).length
   });
 
-  return Object.values(map).map((row) => ({
-    ...row,
-    alasan: row.alasan_list.join(', '),
-    jenis: row.jenis_list.join(', '),
+  const dataDetailTanggal = tanggalTerpilih
+    ? daftarIzin.filter((item) => normalisasiTanggal(item.tanggal) === normalisasiTanggal(tanggalTerpilih))
+    : [];
+
+  const maxCount = Math.max(...daftarTanggalGrafik.map((item) => hitungIzinPerTanggal(item.full)), 1);
+
+  const hitungKelompok = (items, getKey) =>
+    Object.entries(
+      items.reduce((rekap, item) => {
+        const key = getKey(item) || 'Tidak diketahui';
+        rekap[key] = (rekap[key] || 0) + 1;
+        return rekap;
+      }, {})
+    ).sort((a, b) => b[1] - a[1]);
+
+  const rekapJenisKelamin = hitungKelompok(daftarIzin, (item) => item.jenis_kelamin);
+  const rekapKelas = hitungKelompok(daftarIzin, (item) => item.kelas);
+
+  const bulanLaporan = `${waktuSekarang.getFullYear()}-${String(waktuSekarang.getMonth() + 1).padStart(2, '0')}-01`;
+  const [tahunLaporan, bulanLaporanNomor] = (bulanGrafik || bulanLaporan).split('-').map(Number);
+  const daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+  const rekapMingguan = daftarHari.map((namaHari, indexHari) => {
+    const dataHari = daftarIzin.filter((item) => {
+      const tanggalItem = normalisasiTanggal(item.tanggal);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggalItem)) return false;
+      const [tahun, bulan, hari] = tanggalItem.split('-').map(Number);
+      const tanggalObj = new Date(tahun, bulan - 1, hari);
+      const hariSenin = (tanggalObj.getDay() + 6) % 7;
+      return tahun === tahunLaporan && bulan === bulanLaporanNomor && hariSenin === indexHari;
+    });
+    return { label: namaHari, data: dataHari };
+  });
+
+  const maxMingguan = Math.max(...rekapMingguan.map((item) => item.data.length), 1);
+  const dataHariTerpilih = hariTerpilih ? (rekapMingguan.find((item) => item.label === hariTerpilih)?.data || []) : [];
+
+  const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const jumlahHariDalamBulan = new Date(tahunLaporan, bulanLaporanNomor, 0).getDate();
+  const tanggalAwalGrafik = `01 ${namaBulan[bulanLaporanNomor - 1]} ${tahunLaporan}`;
+  const tanggalAkhirGrafik = `${jumlahHariDalamBulan} ${namaBulan[bulanLaporanNomor - 1]} ${tahunLaporan}`;
+
+  const rekapBulanan = namaBulan.map((nama, indexBulan) => ({
+    nama,
+    index: indexBulan,
+    data: daftarIzin.filter((item) => {
+      const tanggalItem = normalisasiTanggal(item.tanggal);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggalItem)) return false;
+      const [tahun, bulan] = tanggalItem.split('-').map(Number);
+      return tahun === tahunLaporan && bulan === indexBulan + 1;
+    })
   }));
-};
+
+  const maxBulanan = Math.max(...rekapBulanan.map((item) => item.data.length), 1);
+  const dataBulanTerpilih = bulanTerpilih !== null ? (rekapBulanan.find((item) => item.index === bulanTerpilih)?.data || []) : [];
+
+  const totalJenisKelamin = rekapJenisKelamin.reduce((total, [, jumlah]) => total + jumlah, 0);
+  let sudutDonat = 0;
+  const gradientJenisKelamin = rekapJenisKelamin
+    .map(([label, jumlah]) => {
+      const sudutAwal = sudutDonat;
+      sudutDonat += (jumlah / Math.max(totalJenisKelamin, 1)) * 360;
+      const warna = String(label).toLowerCase().includes('perempuan') ? '#ec4899' : '#3b82f6';
+      return `${warna} ${sudutAwal}deg ${sudutDonat}deg`;
+    })
+    .join(', ');
+
+  const koordinatBulanan = rekapBulanan.map((item, index) => ({
+    x: 20 + index * 60,
+    y: 170 - (item.data.length / maxBulanan) * 130
+  }));
+
+  const jalurBulanan = koordinatBulanan.reduce((jalur, titik, index) => {
+    if (index === 0) return `M ${titik.x} ${titik.y}`;
+    const sebelumnya = koordinatBulanan[index - 1];
+    const kontrolKiri = sebelumnya.x + (titik.x - sebelumnya.x) / 2;
+    return `${jalur} C ${kontrolKiri} ${sebelumnya.y}, ${kontrolKiri} ${titik.y}, ${titik.x} ${titik.y}`;
+  }, '');
+
+  return (
+    <div style={{ maxWidth: '950px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* REKAPITULASI TANGGAL */}
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#1e293b' }}>1. Rekapitulasi Jumlah Izin (Berdasarkan Tanggal)</h4>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Klik salah satu tanggal pada grafik untuk melihat rincian.</p>
+        <div style={{ position: 'relative', height: '220px', marginTop: '2.5rem', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundImage: 'linear-gradient(to bottom, transparent 49.5%, #e2e8f0 50%, transparent 50.5%)', display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', padding: '0 1rem 1.75rem 2.25rem' }}>
+          {daftarTanggalGrafik.map((tglItem) => {
+            const count = hitungIzinPerTanggal(tglItem.full);
+            const dataTanggal = daftarIzin.filter((item) => normalisasiTanggal(item.tanggal) === normalisasiTanggal(tglItem.full));
+            const jumlahWarna = hitungWarnaIzin(dataTanggal);
+            const barHeight = count > 0 ? Math.max((count / maxCount) * 100, 25) : 0;
+
+            return (
+              <div key={tglItem.full} onClick={() => setTanggalTerpilih(tglItem.full)} style={{ flex: '1 1 0', maxWidth: '36px', minWidth: 0, height: '100%', position: 'relative', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <div style={{ width: '100%', height: `${barHeight}%`, minHeight: count > 0 ? '30px' : '0px', backgroundColor: '#e5e7eb', display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px', overflow: 'hidden' }}>
+                  {jumlahWarna.izin > 0 && <div style={{ height: `${(jumlahWarna.izin / count) * 100}%`, width: '100%', backgroundColor: '#3b82f6' }} />}
+                  {jumlahWarna.sakit > 0 && <div style={{ height: `${(jumlahWarna.sakit / count) * 100}%`, width: '100%', backgroundColor: '#10b981' }} />}
+                </div>
+                <span style={{ position: 'absolute', bottom: '-18px', fontSize: '0.62rem', color: '#64748b', whiteSpace: 'nowrap' }}>{tglItem.label.slice(0, 5)}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {tanggalTerpilih && (
+          <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#1e293b' }}>Detail Izin Tanggal: {tanggalTerpilih}</h4>
+            {dataDetailTanggal.length === 0 ? (
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada tanggal ini.</p>
+            ) : (
+              <TabelDetail data={dataDetailTanggal} tampilTanggal={false} formatTanggal={normalisasiTanggal} />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* GRAFIK JENIS KELAMIN & KELAS */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: '#1e293b' }}>Grafik Jenis Kelamin</h3>
+          {rekapJenisKelamin.length === 0 ? (
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Belum ada data.</p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div style={{ width: '135px', height: '135px', flex: '0 0 135px', borderRadius: '50%', background: `conic-gradient(${gradientJenisKelamin})`, display: 'grid', placeItems: 'center' }}>
+                <div style={{ width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#ffffff' }} />
+              </div>
+              <div style={{ display: 'grid', gap: '0.55rem', fontSize: '0.78rem', color: '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ec4899' }} />
+                  <span>Perempuan</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3b82f6' }} />
+                  <span>Laki-laki</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: '#1e293b' }}>Grafik Berdasarkan Kelas</h3>
+          {rekapKelas.length === 0 ? (
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Belum ada data.</p>
+          ) : (
+            rekapKelas.map(([label, total]) => (
+              <div key={label} style={{ marginBottom: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', marginBottom: '4px' }}>
+                  <span>{label}</span>
+                  <strong>{total}</strong>
+                </div>
+                <div style={{ height: '12px', backgroundColor: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                  <div style={{ width: `${(total / Math.max(...rekapKelas.map((item) => item[1]))) * 100}%`, height: '100%', backgroundColor: '#6366f1', borderRadius: '999px' }} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* GRAFIK MINGGUAN */}
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: '#1e293b' }}>
+          Grafik Mingguan: {tanggalAwalGrafik} sampai {tanggalAkhirGrafik} (Klik bar hari)
+        </h3>
+        <div style={{ position: 'relative', height: '190px', display: 'flex', alignItems: 'flex-end', gap: 'clamp(0.2rem, 1.5vw, 1rem)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 clamp(0.3rem, 2vw, 1rem) 0.5rem', marginTop: '1rem' }}>
+          {rekapMingguan.map((minggu) => {
+            const total = minggu.data.length;
+            const jumlahWarna = hitungWarnaIzin(minggu.data);
+            const barHeight = total ? Math.max((total / maxMingguan) * 82, 10) : 0;
+
+            return (
+              <div key={minggu.label} onClick={() => setHariTerpilih(hariTerpilih === minggu.label ? '' : minggu.label)} style={{ position: 'relative', flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ width: 'min(52px, 80%)', height: `${barHeight}%`, minHeight: barHeight > 0 ? '4px' : '0', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: '5px 5px 0 0', border: hariTerpilih === minggu.label ? '2px solid #2563eb' : 'none' }}>
+                  <div style={{ height: `${total ? (jumlahWarna.izin / total) * 100 : 0}%`, backgroundColor: '#2563eb' }} />
+                  <div style={{ height: `${total ? (jumlahWarna.sakit / total) * 100 : 0}%`, backgroundColor: '#16a34a' }} />
+                </div>
+                <span style={{ marginTop: '8px', fontSize: '0.72rem', color: hariTerpilih === minggu.label ? '#2563eb' : '#64748b', fontWeight: hariTerpilih === minggu.label ? 'bold' : 'normal' }} title={minggu.label}>{minggu.label.slice(0, 3)}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {hariTerpilih && (
+          <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#1e293b' }}>Detail Izin Hari: {hariTerpilih}</h4>
+            {dataHariTerpilih.length === 0 ? (
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada hari {hariTerpilih}.</p>
+            ) : (
+              <TabelDetail data={dataHariTerpilih} tampilTanggal formatTanggal={normalisasiTanggal} />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* GRAFIK BULANAN */}
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: '#1e293b' }}>Grafik Bulanan (Klik titik bulan)</h3>
+        <div style={{ width: '100%' }}>
+          <svg viewBox="0 0 740 220" role="img" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+            <line x1="20" y1="40" x2="20" y2="170" stroke="#cbd5e1" />
+            <line x1="20" y1="170" x2="710" y2="170" stroke="#cbd5e1" />
+            <path d={jalurBulanan} fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            {rekapBulanan.map((bulan) => {
+              const x = 20 + bulan.index * 60;
+              const y = 170 - (bulan.data.length / maxBulanan) * 130;
+              const isSelected = bulanTerpilih === bulan.index;
+              return (
+                <g key={bulan.nama} onClick={() => setBulanTerpilih(isSelected ? null : bulan.index)} style={{ cursor: 'pointer' }}>
+                  <circle cx={x} cy={y} r="22" fill="transparent" />
+                  <circle cx={x} cy={y} r={isSelected ? "11" : "8"} fill="#f59e0b" stroke={isSelected ? "#2563eb" : "#ffffff"} strokeWidth={isSelected ? "4" : "3"} />
+                  <text x={x} y="200" textAnchor="middle" fontSize="15" fill={isSelected ? "#2563eb" : "#64748b"} fontWeight={isSelected ? "bold" : "normal"}>{bulan.nama.slice(0, 3)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {bulanTerpilih !== null && (
+          <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#1e293b' }}>Detail Izin Bulan: {namaBulan[bulanTerpilih]}</h4>
+            {dataBulanTerpilih.length === 0 ? (
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Tidak ada izin pada bulan {namaBulan[bulanTerpilih]}.</p>
+            ) : (
+              <TabelDetail data={dataBulanTerpilih} tampilTanggal formatTanggal={normalisasiTanggal} />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardGuruPiket({ user, onLogout }) {
   const [daftarIzin, setDaftarIzin] = useState([]);
@@ -70,16 +325,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [jenisIzinTerpilih, setJenisIzinTerpilih] = useState('');
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedWeeklyDay, setSelectedWeeklyDay] = useState(null);
-  const [selectedMonthlyIndex, setSelectedMonthlyIndex] = useState(null);
-  const [tanggalSekarang, setTanggalSekarang] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => setTanggalSekarang(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   // senyap = true  -> refresh di belakang layar (tanpa "Memuat...", tabel tidak berkedip/bergeser)
   // senyap = false -> dipakai saat pertama buka & tombol "Muat Ulang"
@@ -161,261 +407,6 @@ export default function DashboardGuruPiket({ user, onLogout }) {
   const formatTanggal = (tanggal) => String(tanggal || '-').split('T')[0];
   const normalisasiTanggal = (tanggal) => String(tanggal || '').split('T')[0];
   
-  const tahunIni = tanggalSekarang.getFullYear();
-
-  // Data untuk tabel detail saat grafik diklik
-  const dataTabelTanggal = kelompokkanSiswa(
-    daftarIzin.filter((item) => getDateOnly(item.tanggal) === selectedDate),
-    true
-  );
-
-  const dataTabelMingguan = kelompokkanSiswa(
-    daftarIzin.filter(
-      (item) => selectedWeeklyDay !== null && getIndexHari(item.tanggal) === selectedWeeklyDay.index
-    ),
-    true
-  );
-
-  const dataTabelBulanan = kelompokkanSiswa(
-    daftarIzin.filter((item) => {
-      if (selectedMonthlyIndex === null) return false;
-      const tgl = getDateOnly(item.tanggal);
-      if (!tgl) return false;
-      const d = new Date(`${tgl}T00:00:00`);
-      return d.getFullYear() === tahunIni && d.getMonth() === selectedMonthlyIndex.index;
-    }),
-    false
-  );
-
-  // ============================================================
-  // GRAFIK (Chart.js) - tanggal, mingguan, bulanan
-  // Klik batang / titik -> tabel siswa yang izin muncul di bawah grafik
-  // ============================================================
-  useEffect(() => {
-    if (activeMenu !== 'grafik') return;
-
-    const opsiLegend = {
-      legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 8, font: { size: 10 }, padding: 10 } },
-    };
-    const skalaY = { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { borderDash: [4, 4] } };
-    const skalaX = { grid: { display: false } };
-    const charts = [];
-
-    // --- Grafik Tanggal: tanggal 07 sampai 01 pada bulan berjalan (sama seperti Satpam) ---
-    const tahunSkrg = tanggalSekarang.getFullYear();
-    const bulanSkrg = String(tanggalSekarang.getMonth() + 1).padStart(2, '0');
-    const labelTanggal = Array.from({ length: 7 }, (_, i) => `${tahunSkrg}-${bulanSkrg}-${String(7 - i).padStart(2, '0')}`);
-    const tanggalIzin = labelTanggal.map(
-      (t) => daftarIzin.filter((it) => getDateOnly(it.tanggal) === t && !isSakit(it)).length
-    );
-    const tanggalSakit = labelTanggal.map(
-      (t) => daftarIzin.filter((it) => getDateOnly(it.tanggal) === t && isSakit(it)).length
-    );
-
-    const ctxTanggal = document.getElementById('gpChartTanggal')?.getContext('2d');
-    if (ctxTanggal) {
-      charts.push(new Chart(ctxTanggal, {
-        type: 'bar',
-        data: {
-          labels: labelTanggal,
-          datasets: [
-            { label: 'Izin', data: tanggalIzin, backgroundColor: '#2563eb', borderRadius: 4, maxBarThickness: 35 },
-            { label: 'Sakit', data: tanggalSakit, backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 35 },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          onClick: (event, elements) => {
-            if (elements && elements.length > 0) setSelectedDate(labelTanggal[elements[0].index]);
-          },
-          scales: { y: skalaY, x: skalaX },
-          plugins: opsiLegend,
-        },
-      }));
-    }
-
-    // --- Grafik Jenis Kelamin ---
-    let jmlPerempuan = 0;
-    let jmlLaki = 0;
-    daftarIzin.forEach((item) => {
-      const jk = String(item.jenis_kelamin || '').trim().toLowerCase();
-      if (jk.startsWith('p')) jmlPerempuan += 1;
-      else if (jk.startsWith('l')) jmlLaki += 1;
-    });
-    const ctxKelamin = document.getElementById('gpChartKelamin')?.getContext('2d');
-    if (ctxKelamin) {
-      charts.push(new Chart(ctxKelamin, {
-        type: 'doughnut',
-        data: {
-          labels: ['Perempuan', 'Laki-laki'],
-          datasets: [{ data: [jmlPerempuan, jmlLaki], backgroundColor: ['#db2777', '#3b82f6'], borderWidth: 0 }],
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: opsiLegend },
-      }));
-    }
-
-    // --- Grafik Berdasarkan Kelas ---
-    const hitungKelas = {};
-    daftarIzin.forEach((item) => {
-      const kls = item.kelas || 'Lainnya';
-      hitungKelas[kls] = (hitungKelas[kls] || 0) + 1;
-    });
-    const labelKelas = Object.keys(hitungKelas);
-    const ctxKelas = document.getElementById('gpChartKelas')?.getContext('2d');
-    if (ctxKelas) {
-      charts.push(new Chart(ctxKelas, {
-        type: 'bar',
-        data: {
-          labels: labelKelas.length > 0 ? labelKelas : ['-'],
-          datasets: [{
-            label: 'Jumlah',
-            data: labelKelas.length > 0 ? labelKelas.map((k) => hitungKelas[k]) : [0],
-            backgroundColor: '#8b5cf6',
-            borderRadius: 4,
-            maxBarThickness: 35,
-          }],
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { borderDash: [4, 4] } },
-            y: { grid: { display: false } },
-          },
-          plugins: { legend: { display: false } },
-        },
-      }));
-    }
-
-    // --- Grafik Mingguan: Senin - Minggu ---
-    const mingguIzin = [0, 0, 0, 0, 0, 0, 0];
-    const mingguSakit = [0, 0, 0, 0, 0, 0, 0];
-    daftarIzin.forEach((item) => {
-      const idx = getIndexHari(item.tanggal);
-      if (idx < 0) return;
-      if (isSakit(item)) mingguSakit[idx] += 1;
-      else mingguIzin[idx] += 1;
-    });
-
-    const ctxMingguan = document.getElementById('gpChartMingguan')?.getContext('2d');
-    if (ctxMingguan) {
-      charts.push(new Chart(ctxMingguan, {
-        type: 'bar',
-        data: {
-          labels: HARI_LABEL,
-          datasets: [
-            { label: 'Izin', data: mingguIzin, backgroundColor: '#2563eb', borderRadius: 4, maxBarThickness: 35 },
-            { label: 'Sakit', data: mingguSakit, backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 35 },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          onClick: (event, elements) => {
-            if (elements && elements.length > 0) {
-              const index = elements[0].index;
-              setSelectedWeeklyDay({ index, name: HARI_LABEL[index] });
-            }
-          },
-          scales: { y: skalaY, x: skalaX },
-          plugins: opsiLegend,
-        },
-      }));
-    }
-
-    // --- Grafik Bulanan: Jan - Des tahun berjalan ---
-    const nilaiBulan = BULAN_SINGKAT.map((_, m) =>
-      daftarIzin.filter((item) => {
-        const tgl = getDateOnly(item.tanggal);
-        if (!tgl) return false;
-        const d = new Date(`${tgl}T00:00:00`);
-        return d.getFullYear() === tahunIni && d.getMonth() === m;
-      }).length
-    );
-
-    const ctxBulanan = document.getElementById('gpChartBulanan')?.getContext('2d');
-    if (ctxBulanan) {
-      charts.push(new Chart(ctxBulanan, {
-        type: 'line',
-        data: {
-          labels: BULAN_SINGKAT,
-          datasets: [{
-            label: 'Jumlah Izin',
-            data: nilaiBulan,
-            borderColor: '#f97316',
-            backgroundColor: 'rgba(249, 115, 22, 0.12)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          onClick: (event, elements) => {
-            if (elements && elements.length > 0) {
-              const index = elements[0].index;
-              setSelectedMonthlyIndex({ index, name: BULAN_SINGKAT[index] });
-            }
-          },
-          scales: { y: skalaY, x: skalaX },
-          plugins: opsiLegend,
-        },
-      }));
-    }
-
-    return () => charts.forEach((c) => c.destroy());
-  }, [activeMenu, daftarIzin, tanggalSekarang]);
-
-  // Tabel detail yang dipakai bersama oleh ketiga grafik
-  const renderTabelDetail = (judul, rows, onTutup, tampilkanTanggal = false) => (
-    <div style={styles.cardGrafik}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '15px', flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>{judul}</h3>
-        <button type="button" onClick={onTutup} style={styles.btnTutupTabel}>Tutup Tabel</button>
-      </div>
-      <div className="rt-wrap" style={styles.tableWrapper}>
-        <table className="rt" style={styles.detailTable}>
-          <thead>
-            <tr style={styles.trHeadGrafik}>
-              <th style={styles.thGrafik}>Nama</th>
-              <th style={styles.thGrafik}>Kelas</th>
-              <th style={styles.thGrafik}>Jenis Kelamin</th>
-              <th style={styles.thGrafik}>Jenis</th>
-              <th style={styles.thGrafik}>Alasan</th>
-              {tampilkanTanggal && <th style={styles.thGrafik}>Tanggal</th>}
-              <th style={styles.thGrafik}>Total Izin</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={tampilkanTanggal ? 7 : 6} style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
-                  Tidak ada data.
-                </td>
-              </tr>
-            ) : (
-              rows.map((row, idx) => (
-                <tr key={`${row.nama}-${row.kelas}-${row.tanggal}-${idx}`} style={styles.trBody}>
-                  <td data-label="Nama" style={{ ...styles.tdGrafik, fontWeight: '600', color: '#0f172a' }}>{row.nama}</td>
-                  <td data-label="Kelas" style={styles.tdGrafik}>{row.kelas}</td>
-                  <td data-label="Jenis Kelamin" style={styles.tdGrafik}>{row.jenis_kelamin}</td>
-                  <td data-label="Jenis" style={styles.tdGrafik}>{row.jenis}</td>
-                  <td data-label="Alasan" style={styles.tdGrafik}>{row.alasan}</td>
-                  {tampilkanTanggal && <td data-label="Tanggal" style={styles.tdGrafik}>{row.tanggal || '-'}</td>}
-                  <td data-label="Total Izin" style={styles.tdGrafik}>{row.total_izin}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   // ============================================================
   // DOWNLOAD EXCEL
   // Membuat file Excel (.xls) langsung di browser dari data izin
@@ -625,67 +616,8 @@ export default function DashboardGuruPiket({ user, onLogout }) {
                 </p>
               </div>
 
-              {/* GRAFIK TANGGAL */}
-              <div style={styles.cardGrafik}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#1e293b' }}>Rekapitulasi Jumlah Izin Berdasarkan Tanggal</h3>
-                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '15px' }}>Klik tanggal atau warna pada grafik untuk melihat tabel detail pengajuan.</p>
-                <div style={{ position: 'relative', height: '260px', width: '100%' }}>
-                  <canvas id="gpChartTanggal" />
-                </div>
-              </div>
-              {selectedDate &&
-                renderTabelDetail(`Detail Izin Tanggal ${selectedDate}`, dataTabelTanggal, () => setSelectedDate(null))}
-
-              {/* GRAFIK KELAMIN & KELAS */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-                <div style={styles.cardGrafik}>
-                  <h3 style={{ margin: '0 0 15px 0', fontSize: '15px', color: '#1e293b' }}>Grafik Jenis Kelamin</h3>
-                  <div style={{ position: 'relative', height: '220px', width: '100%', display: 'flex', justifyContent: 'center' }}>
-                    <canvas id="gpChartKelamin" />
-                  </div>
-                </div>
-                <div style={styles.cardGrafik}>
-                  <h3 style={{ margin: '0 0 15px 0', fontSize: '15px', color: '#1e293b' }}>Grafik Berdasarkan Kelas</h3>
-                  <div style={{ position: 'relative', height: '220px', width: '100%' }}>
-                    <canvas id="gpChartKelas" />
-                  </div>
-                </div>
-              </div>
-
-              {/* GRAFIK MINGGUAN */}
-              <div style={styles.cardGrafik}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#1e293b' }}>Grafik Mingguan</h3>
-                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '15px' }}>
-                  Jumlah pengajuan izin dan sakit dari hari Senin sampai Minggu. Klik batang grafik untuk melihat detail.
-                </p>
-                <div style={{ position: 'relative', height: '260px', width: '100%' }}>
-                  <canvas id="gpChartMingguan" />
-                </div>
-              </div>
-              {selectedWeeklyDay !== null &&
-                renderTabelDetail(
-                  `Detail Izin Hari ${selectedWeeklyDay.name}`,
-                  dataTabelMingguan,
-                  () => setSelectedWeeklyDay(null),
-                  true
-                )}
-
-              {/* GRAFIK BULANAN */}
-              <div style={styles.cardGrafik}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#1e293b' }}>Grafik Bulanan</h3>
-                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '15px' }}>
-                  Jumlah pengajuan izin berdasarkan bulan pada tahun berjalan. Klik titik bulan untuk melihat detail tabel bulanan.
-                </p>
-                <div style={{ position: 'relative', height: '260px', width: '100%' }}>
-                  <canvas id="gpChartBulanan" />
-                </div>
-              </div>
-              {selectedMonthlyIndex !== null &&
-                renderTabelDetail(
-                  `Detail Izin Bulan ${BULAN_PENUH[selectedMonthlyIndex.index]}`,
-                  dataTabelBulanan,
-                  () => setSelectedMonthlyIndex(null)
-                )}
+              {/* Grafik & tabel detail: komponen yang sama persis dengan Dashboard Siswa */}
+              <GrafikStatistik daftarIzin={daftarIzin} />
             </div>
           )}
 
