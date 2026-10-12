@@ -289,6 +289,9 @@ export default function Login({ onLoginSuccess }) {
         </form>
 
       </div>
+      <footer style={{ position: 'absolute', bottom: '12px', left: 0, right: 0, textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+        © {new Date().getFullYear()} SMK Negeri Compreng · Sistem Perizinan Siswa
+      </footer>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { API_URL, authFetch } from './apiConfig';
 
 const sel = { padding: '0.7rem', borderBottom: '1px solid #f1f5f9', textAlign: 'left' };
@@ -39,7 +40,7 @@ function TabelDetail({ data, tampilTanggal, formatTanggal }) {
 // - Notifikasi baru muncul sebagai pop-up 6 detik + angka merah di lonceng
 // ======================================================
 const INTERVAL_MS = 5000;
-const POPUP_MS = 6000;
+const POPUP_MS = 8000;
 const MAKS_POPUP = 3;
 const MAKS_DIBACA = 300;
 
@@ -170,6 +171,11 @@ function NotifikasiLonceng({ user, peran }) {
     };
   }, [terbuka]);
 
+  const tutupPopup = () => {
+    tandaiDibaca(popup.map((n) => n.key));
+    setPopup([]);
+  };
+
   const belumDibaca = daftar.filter((n) => !dibaca.has(n.key));
 
   return (
@@ -269,55 +275,57 @@ function NotifikasiLonceng({ user, peran }) {
         </div>
       )}
 
-      {/* POP-UP NOTIFIKASI BARU */}
-      {popup.length > 0 && (
-        <div
-          style={{
-            position: 'fixed', top: '16px', right: '16px', zIndex: 999999,
-            width: '360px', maxWidth: 'calc(100vw - 32px)', display: 'flex',
-            flexDirection: 'column', gap: '10px'
-          }}
-        >
-          {popup.map((n) => (
+      {/* POP-UP NOTIFIKASI BARU (di tengah layar) */}
+      {popup.length > 0 &&
+        createPortal(
+          <div
+            onClick={tutupPopup}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 999999, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', padding: '16px',
+              background: 'rgba(15, 23, 42, 0.45)'
+            }}
+          >
             <div
-              key={n.key}
+              onClick={(e) => e.stopPropagation()}
               style={{
-                background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: '12px 16px',
-                display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '13px',
-                animation: 'notifLoncengMasuk 0.3s ease-out', textAlign: 'left'
+                width: '380px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto',
+                background: '#fff', borderRadius: '14px', padding: '24px 22px 20px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.25)', textAlign: 'center',
+                animation: 'notifLoncengMasuk 0.25s ease-out', boxSizing: 'border-box'
               }}
             >
-              <span style={{ fontSize: '18px', lineHeight: 1, marginTop: '2px' }}>🔔</span>
-              <div style={{ flex: 1, lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '3px' }}>
-                  {n.judul || 'Notifikasi'}
+              <div style={{ fontSize: '36px', lineHeight: 1 }}>🔔</div>
+              {popup.map((n) => (
+                <div key={n.key} style={{ marginTop: '14px' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#0f172a' }}>
+                    {n.judul || 'Notifikasi'}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#475569', marginTop: '4px', lineHeight: 1.5 }}>
+                    {n.pesan}
+                  </div>
                 </div>
-                <div style={{ color: '#475569' }}>{n.pesan}</div>
-              </div>
+              ))}
               <button
                 type="button"
-                title="Tutup"
-                onClick={() => {
-                  tandaiDibaca([n.key]);
-                  setPopup((lama) => lama.filter((x) => x.key !== n.key));
-                }}
+                onClick={tutupPopup}
                 style={{
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  fontSize: '16px', lineHeight: 1, color: '#94a3b8', padding: 0
+                  marginTop: '18px', border: 'none', borderRadius: '8px', padding: '9px 28px',
+                  background: '#2563eb', color: '#fff', fontSize: '13px',
+                  fontWeight: 'bold', cursor: 'pointer'
                 }}
               >
-                ✕
+                OK
               </button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       <style>{`
         @keyframes notifLoncengMasuk {
-          from { opacity: 0; transform: translateY(-16px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: scale(0.92); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>
@@ -948,6 +956,9 @@ export default function DashboardSiswa({ user, onLogout }) {
             </div>
           )}
         </div>
+        <footer style={{ marginTop: 'auto', padding: '14px 24px', textAlign: 'center', fontSize: '12px', color: '#64748b', borderTop: '1px solid #e2e8f0', background: '#ffffff', boxSizing: 'border-box' }}>
+          © {new Date().getFullYear()} SMK Negeri Compreng · Sistem Perizinan Siswa
+        </footer>
       </div>
     </div>
   );
