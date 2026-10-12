@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { API_URL, authFetch } from './apiConfig';
 
 const sel = { padding: '0.7rem', borderBottom: '1px solid #f1f5f9', textAlign: 'left' };
@@ -27,6 +27,299 @@ function TabelDetail({ data, tampilTanggal, formatTanggal }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ======================================================
+// LONCENG NOTIFIKASI (dipakai Siswa, Guru Piket, Satpam)
+// - Mengecek /notifikasi ke backend tiap 5 detik
+// - Daftar notifikasi datang dari server (sesuai peran yang login)
+// - Status "sudah dibaca" disimpan di browser (localStorage)
+// - Notifikasi baru muncul sebagai pop-up 6 detik + angka merah di lonceng
+// ======================================================
+const INTERVAL_MS = 5000;
+const POPUP_MS = 6000;
+const MAKS_POPUP = 3;
+const MAKS_DIBACA = 300;
+
+const bacaDibaca = (kunci) => {
+  try {
+    const mentah = localStorage.getItem(kunci);
+    return mentah === null ? null : new Set(JSON.parse(mentah));
+  } catch {
+    return null;
+  }
+};
+
+const simpanDibaca = (kunci, set) => {
+  try {
+    localStorage.setItem(kunci, JSON.stringify([...set].slice(-MAKS_DIBACA)));
+  } catch {
+    /* penyimpanan penuh / diblokir: abaikan */
+  }
+};
+
+const formatWaktu = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+  });
+};
+
+function NotifikasiLonceng({ user, peran }) {
+  const idUser = user?.id_pengguna || user?.id || user?.nama_lengkap || user?.username || 'anon';
+  const kunciStorage = `notif_dibaca_${peran}_${idUser}`;
+
+  const [daftar, setDaftar] = useState([]);
+  const [dibaca, setDibaca] = useState(() => bacaDibaca(kunciStorage) || new Set());
+  const [terbuka, setTerbuka] = useState(false);
+  const [popup, setPopup] = useState([]);
+
+  // ref supaya interval selalu memakai nilai terbaru tanpa dibuat ulang
+  const dibacaRef = useRef(dibaca);
+  const sudahPopupRef = useRef(new Set());
+  const pertamaRef = useRef(true);
+  const wadahRef = useRef(null);
+
+  useEffect(() => {
+    dibacaRef.current = dibaca;
+  }, [dibaca]);
+
+  const tandaiDibaca = useCallback(
+    (keys) => {
+      const baru = new Set(dibacaRef.current);
+      keys.forEach((k) => baru.add(k));
+      dibacaRef.current = baru;
+      setDibaca(baru);
+      simpanDibaca(kunciStorage, baru);
+    },
+    [kunciStorage]
+  );
+
+  useEffect(() => {
+    let aktif = true;
+
+    const cek = async () => {
+      try {
+        const response = await authFetch(`${API_URL}/notifikasi?_=${Date.now()}`, {
+          cache: 'no-store'
+        });
+        const hasil = await response.json();
+        if (!aktif || !response.ok || !hasil.success) return;
+
+        const data = (Array.isArray(hasil.data) ? hasil.data : []).map((n) => ({
+          ...n,
+          key: n.notification_key || `${peran}-${n.id_pengajuan}`
+        }));
+        setDaftar(data);
+
+        // Pertama kali dibuka di browser ini: anggap data lama sudah dibaca
+        // supaya tidak muncul banyak pop-up sekaligus.
+        if (pertamaRef.current) {
+          pertamaRef.current = false;
+          if (bacaDibaca(kunciStorage) === null) {
+            tandaiDibaca(data.map((n) => n.key));
+            data.forEach((n) => sudahPopupRef.current.add(n.key));
+            return;
+          }
+        }
+
+        const baru = data.filter(
+          (n) => !dibacaRef.current.has(n.key) && !sudahPopupRef.current.has(n.key)
+        );
+        if (baru.length > 0) {
+          baru.forEach((n) => sudahPopupRef.current.add(n.key));
+          setPopup((lama) => [...baru.slice(0, MAKS_POPUP), ...lama].slice(0, MAKS_POPUP));
+        }
+      } catch (err) {
+        if (aktif) console.error('Gagal mengecek notifikasi:', err);
+      }
+    };
+
+    cek();
+    const interval = setInterval(cek, INTERVAL_MS);
+    return () => {
+      aktif = false;
+      clearInterval(interval);
+    };
+  }, [peran, kunciStorage, tandaiDibaca]);
+
+  // pop-up hilang sendiri
+  useEffect(() => {
+    if (popup.length === 0) return undefined;
+    const timers = popup.map((n) =>
+      setTimeout(() => setPopup((lama) => lama.filter((x) => x.key !== n.key)), POPUP_MS)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [popup]);
+
+  // klik di luar -> tutup daftar
+  useEffect(() => {
+    if (!terbuka) return undefined;
+    const tutup = (e) => {
+      if (wadahRef.current && !wadahRef.current.contains(e.target)) setTerbuka(false);
+    };
+    document.addEventListener('mousedown', tutup);
+    document.addEventListener('touchstart', tutup);
+    return () => {
+      document.removeEventListener('mousedown', tutup);
+      document.removeEventListener('touchstart', tutup);
+    };
+  }, [terbuka]);
+
+  const belumDibaca = daftar.filter((n) => !dibaca.has(n.key));
+
+  return (
+    <div ref={wadahRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={() => setTerbuka((t) => !t)}
+        aria-label={`Notifikasi, ${belumDibaca.length} belum dibaca`}
+        title="Notifikasi"
+        style={{
+          position: 'relative', border: '1px solid #e2e8f0', background: '#fff',
+          borderRadius: '8px', width: '38px', height: '38px', cursor: 'pointer',
+          fontSize: '18px', lineHeight: 1, display: 'inline-flex',
+          alignItems: 'center', justifyContent: 'center'
+        }}
+      >
+        🔔
+        {belumDibaca.length > 0 && (
+          <span
+            style={{
+              position: 'absolute', top: '-6px', right: '-6px', minWidth: '18px',
+              height: '18px', padding: '0 5px', borderRadius: '9px',
+              background: '#dc2626', color: '#fff', fontSize: '11px',
+              fontWeight: 'bold', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', boxSizing: 'border-box'
+            }}
+          >
+            {belumDibaca.length > 9 ? '9+' : belumDibaca.length}
+          </span>
+        )}
+      </button>
+
+      {terbuka && (
+        <div
+          style={{
+            position: 'absolute', top: '46px', right: 0, width: '340px',
+            maxWidth: 'calc(100vw - 32px)', background: '#fff',
+            border: '1px solid #e2e8f0', borderRadius: '10px',
+            boxShadow: '0 12px 30px rgba(0,0,0,0.15)', zIndex: 100000, overflow: 'hidden'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px 14px', borderBottom: '1px solid #e2e8f0'
+            }}
+          >
+            <strong style={{ fontSize: '14px', color: '#0f172a' }}>Notifikasi</strong>
+            {belumDibaca.length > 0 && (
+              <button
+                type="button"
+                onClick={() => tandaiDibaca(daftar.map((n) => n.key))}
+                style={{
+                  border: 'none', background: 'transparent', color: '#2563eb',
+                  fontSize: '12px', cursor: 'pointer', padding: 0
+                }}
+              >
+                Tandai semua dibaca
+              </button>
+            )}
+          </div>
+
+          <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+            {daftar.length === 0 ? (
+              <div style={{ padding: '24px 14px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                Belum ada notifikasi.
+              </div>
+            ) : (
+              daftar.map((n) => {
+                const baca = dibaca.has(n.key);
+                return (
+                  <div
+                    key={n.key}
+                    onClick={() => tandaiDibaca([n.key])}
+                    style={{
+                      padding: '10px 14px', borderBottom: '1px solid #f1f5f9',
+                      background: baca ? '#fff' : '#eff6ff', cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: baca ? 600 : 'bold', color: '#0f172a' }}>
+                      {n.judul || 'Notifikasi'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px', lineHeight: 1.4 }}>
+                      {n.pesan}
+                    </div>
+                    {n.tanggal_verifikasi && (
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                        {formatWaktu(n.tanggal_verifikasi)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* POP-UP NOTIFIKASI BARU */}
+      {popup.length > 0 && (
+        <div
+          style={{
+            position: 'fixed', top: '16px', right: '16px', zIndex: 999999,
+            width: '360px', maxWidth: 'calc(100vw - 32px)', display: 'flex',
+            flexDirection: 'column', gap: '10px'
+          }}
+        >
+          {popup.map((n) => (
+            <div
+              key={n.key}
+              style={{
+                background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: '12px 16px',
+                display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '13px',
+                animation: 'notifLoncengMasuk 0.3s ease-out', textAlign: 'left'
+              }}
+            >
+              <span style={{ fontSize: '18px', lineHeight: 1, marginTop: '2px' }}>🔔</span>
+              <div style={{ flex: 1, lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '3px' }}>
+                  {n.judul || 'Notifikasi'}
+                </div>
+                <div style={{ color: '#475569' }}>{n.pesan}</div>
+              </div>
+              <button
+                type="button"
+                title="Tutup"
+                onClick={() => {
+                  tandaiDibaca([n.key]);
+                  setPopup((lama) => lama.filter((x) => x.key !== n.key));
+                }}
+                style={{
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  fontSize: '16px', lineHeight: 1, color: '#94a3b8', padding: 0
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes notifLoncengMasuk {
+          from { opacity: 0; transform: translateY(-16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -388,7 +681,10 @@ export default function DashboardSiswa({ user, onLogout }) {
       <div className="dashboard-siswa-main" style={{ marginLeft: '260px', flex: 1, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
         <div style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b' }}>Dashboard Siswa - Sistem Perizinan</div>
-          <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Login sebagai: <b>{namaAkun}</b></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <NotifikasiLonceng user={user} peran="siswa" />
+            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Login sebagai: <b>{namaAkun}</b></div>
+          </div>
         </div>
 
         <div style={{ padding: '2rem', boxSizing: 'border-box' }}>

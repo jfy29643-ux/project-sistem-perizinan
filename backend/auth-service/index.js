@@ -771,49 +771,118 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
     }
 });
 
-// Notifikasi untuk Satpam: pengajuan yang baru saja disetujui Guru Piket
-// dan belum diproses Satpam (hanya yang diverifikasi dalam 2 menit terakhir)
-app.get('/notifikasi', wajibPeran('satpam'), async (req, res) => {
+// ------------------------------------------------------------------
+// NOTIFIKASI (Siswa, Guru Piket, Satpam) - TANPA tabel baru
+// Satu endpoint, isinya menyesuaikan peran yang login:
+//   guru   -> pengajuan siswa yang masih "Menunggu"
+//   siswa  -> hasil verifikasi Guru Piket untuk pengajuan miliknya
+//   satpam -> pengajuan yang sudah diverifikasi Guru Piket (dan belum diproses Satpam)
+// Server hanya menyiapkan daftar; "sudah dibaca / belum" disimpan di browser.
+// ------------------------------------------------------------------
+const BATAS_NOTIFIKASI = 20;
+
+const teksStatus = (status) =>
+    String(status || '').toLowerCase().includes('tolak') ? 'ditolak' : 'disetujui';
+
+app.get('/notifikasi', async (req, res) => {
     try {
-        const batas = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        const jenis = req.user.jenis;
 
-        const { data: verif, error } = await supabase
-            .from('verifikasi_pengajuan')
-            .select('id_verifikasi_pengajuan, id_pengajuan, status_verifikasi, tanggal_verifikasi')
-            .gte('tanggal_verifikasi', batas)
-            .order('tanggal_verifikasi', { ascending: false })
-            .limit(20);
+        // ---------- GURU PIKET: ada pengajuan baru ----------
+        if (jenis === 'guru') {
+            const { data, error } = await supabase
+                .from('pengajuan_izin')
+                .select('id_pengajuan, nama_lengkap, kelas, jenis_izin, status')
+                .or('status.is.null,status.ilike.%menunggu%')
+                .order('id_pengajuan', { ascending: false })
+                .limit(BATAS_NOTIFIKASI);
 
-        if (error) return fail(res, 500, 'Gagal mengambil notifikasi.', error);
-        if (!verif || verif.length === 0) return ok(res, { success: true, data: [] });
+            if (error) return fail(res, 500, 'Gagal mengambil notifikasi.', error);
 
-        const ids = [...new Set(verif.map((v) => v.id_pengajuan))];
-
-        const { data: pengajuan, error: errP } = await supabase
-            .from('pengajuan_izin')
-            .select('*')
-            .in('id_pengajuan', ids);
-
-        if (errP) return fail(res, 500, 'Gagal mengambil notifikasi.', errP);
-
-        const perId = new Map((pengajuan || []).map((p) => [String(p.id_pengajuan), p]));
-
-        const data = verif
-            .map((v) => ({ v, p: perId.get(String(v.id_pengajuan)) }))
-            .filter(({ p }) => {
-                if (!p) return false;
-                // hanya yang sudah disetujui Guru Piket & belum diproses Satpam
-                return String(p.catatan_verifikasi || '').toLowerCase().includes('disetujui oleh guru');
-            })
-            .map(({ v, p }) => ({
+            const hasil = (data || []).map((p) => ({
                 id_pengajuan: p.id_pengajuan,
                 nama_lengkap: p.nama_lengkap,
                 kelas: p.kelas,
-                notification_key: `v${v.id_verifikasi_pengajuan}`,
-                tanggal_verifikasi: v.tanggal_verifikasi
+                notification_key: `guru-${p.id_pengajuan}`,
+                judul: 'Pengajuan Izin Baru',
+                pesan: `Siswa ${p.nama_lengkap || ''}${p.kelas ? ` (${p.kelas})` : ''} telah mengajukan izin${p.jenis_izin ? ` ${p.jenis_izin}` : ''}.`
             }));
+            return ok(res, { success: true, data: hasil });
+        }
 
-        return ok(res, { success: true, data });
+        // ---------- SISWA: pengajuannya disetujui / ditolak ----------
+        if (jenis === 'siswa') {
+            const { data: semua, error: errS } = await supabase
+                .from('pengajuan_izin')
+                .select('id_pengajuan, id_pengguna, nama_lengkap, kelas');
+
+            if (errS) return fail(res, 500, 'Gagal mengambil notifikasi.', errS);
+
+            const milik = (semua || []).filter((row) => milikSiswa(row, req.user));
+            if (milik.length === 0) return ok(res, { success: true, data: [] });
+
+            const { data: verif, error } = await supabase
+                .from('verifikasi_pengajuan')
+                .select('id_verifikasi_pengajuan, id_pengajuan, status_verifikasi, tanggal_verifikasi')
+                .in('id_pengajuan', milik.map((p) => p.id_pengajuan))
+                .order('tanggal_verifikasi', { ascending: false })
+                .limit(BATAS_NOTIFIKASI);
+
+            if (error) return fail(res, 500, 'Gagal mengambil notifikasi.', error);
+
+            const hasil = (verif || []).map((v) => {
+                const status = teksStatus(v.status_verifikasi);
+                return {
+                    id_pengajuan: v.id_pengajuan,
+                    notification_key: `siswa-v${v.id_verifikasi_pengajuan}`,
+                    tanggal_verifikasi: v.tanggal_verifikasi,
+                    status,
+                    judul: status === 'disetujui' ? 'Pengajuan Disetujui' : 'Pengajuan Ditolak',
+                    pesan: `Pengajuan izin Anda telah ${status} oleh Guru Piket.`
+                };
+            });
+            return ok(res, { success: true, data: hasil });
+        }
+
+        // ---------- SATPAM: siswa sudah diverifikasi Guru Piket ----------
+        if (jenis === 'satpam') {
+            const { data: verif, error } = await supabase
+                .from('verifikasi_pengajuan')
+                .select('id_verifikasi_pengajuan, id_pengajuan, status_verifikasi, tanggal_verifikasi')
+                .order('tanggal_verifikasi', { ascending: false })
+                .limit(BATAS_NOTIFIKASI);
+
+            if (error) return fail(res, 500, 'Gagal mengambil notifikasi.', error);
+            if (!verif || verif.length === 0) return ok(res, { success: true, data: [] });
+
+            const ids = [...new Set(verif.map((v) => v.id_pengajuan))];
+            const { data: pengajuan, error: errP } = await supabase
+                .from('pengajuan_izin')
+                .select('id_pengajuan, nama_lengkap, kelas, catatan_verifikasi')
+                .in('id_pengajuan', ids);
+
+            if (errP) return fail(res, 500, 'Gagal mengambil notifikasi.', errP);
+
+            const perId = new Map((pengajuan || []).map((p) => [String(p.id_pengajuan), p]));
+
+            const hasil = verif
+                .map((v) => ({ v, p: perId.get(String(v.id_pengajuan)) }))
+                // masih berstatus hasil Guru Piket (belum ditimpa verifikasi Satpam)
+                .filter(({ p }) => p && String(p.catatan_verifikasi || '').toLowerCase().includes('oleh guru'))
+                .map(({ v, p }) => ({
+                    id_pengajuan: p.id_pengajuan,
+                    nama_lengkap: p.nama_lengkap,
+                    kelas: p.kelas,
+                    notification_key: `satpam-v${v.id_verifikasi_pengajuan}`,
+                    tanggal_verifikasi: v.tanggal_verifikasi,
+                    judul: 'Izin Keluar Masuk Siswa',
+                    pesan: `Siswa ${p.nama_lengkap || ''} sudah diverifikasi oleh Guru Piket (${teksStatus(v.status_verifikasi)}).`
+                }));
+            return ok(res, { success: true, data: hasil });
+        }
+
+        // admin / peran lain: tidak ada notifikasi
+        return ok(res, { success: true, data: [] });
     } catch (err) {
         return fail(res, 500, 'Terjadi kesalahan pada server.', err);
     }
