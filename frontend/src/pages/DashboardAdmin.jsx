@@ -3213,6 +3213,20 @@ export default function Dashboard() {
 
           </section>
 
+          <footer
+            style={{
+              padding: "14px 24px",
+              textAlign: "center",
+              fontSize: "12px",
+              color: "#64748b",
+              borderTop: "1px solid #e2e8f0",
+              background: "#ffffff",
+              boxSizing: "border-box"
+            }}
+          >
+            © {new Date().getFullYear()} SMK Negeri Compreng · Sistem Perizinan Siswa
+          </footer>
+
         </main>
 
       </div>

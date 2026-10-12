@@ -780,6 +780,8 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
 // Server hanya menyiapkan daftar; "sudah dibaca / belum" disimpan di browser.
 // ------------------------------------------------------------------
 const BATAS_NOTIFIKASI = 20;
+const JENDELA_NOTIF_MS = 24 * 60 * 60 * 1000; // notifikasi hasil verifikasi: 24 jam terakhir
+const batasWaktuNotif = () => new Date(Date.now() - JENDELA_NOTIF_MS).toISOString();
 
 const teksStatus = (status) =>
     String(status || '').toLowerCase().includes('tolak') ? 'ditolak' : 'disetujui';
@@ -825,6 +827,7 @@ app.get('/notifikasi', async (req, res) => {
                 .from('verifikasi_pengajuan')
                 .select('id_verifikasi_pengajuan, id_pengajuan, status_verifikasi, tanggal_verifikasi')
                 .in('id_pengajuan', milik.map((p) => p.id_pengajuan))
+                .gte('tanggal_verifikasi', batasWaktuNotif())
                 .order('tanggal_verifikasi', { ascending: false })
                 .limit(BATAS_NOTIFIKASI);
 
@@ -849,6 +852,7 @@ app.get('/notifikasi', async (req, res) => {
             const { data: verif, error } = await supabase
                 .from('verifikasi_pengajuan')
                 .select('id_verifikasi_pengajuan, id_pengajuan, status_verifikasi, tanggal_verifikasi')
+                .gte('tanggal_verifikasi', batasWaktuNotif())
                 .order('tanggal_verifikasi', { ascending: false })
                 .limit(BATAS_NOTIFIKASI);
 
@@ -867,8 +871,8 @@ app.get('/notifikasi', async (req, res) => {
 
             const hasil = verif
                 .map((v) => ({ v, p: perId.get(String(v.id_pengajuan)) }))
-                // masih berstatus hasil Guru Piket (belum ditimpa verifikasi Satpam)
-                .filter(({ p }) => p && String(p.catatan_verifikasi || '').toLowerCase().includes('oleh guru'))
+                // tampilkan selama belum diproses Satpam
+                .filter(({ p }) => p && !String(p.catatan_verifikasi || '').toLowerCase().includes('oleh satpam'))
                 .map(({ v, p }) => ({
                     id_pengajuan: p.id_pengajuan,
                     nama_lengkap: p.nama_lengkap,
