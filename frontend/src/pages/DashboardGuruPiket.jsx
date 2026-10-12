@@ -561,7 +561,8 @@ export default function DashboardGuruPiket({ user, onLogout }) {
       </div>
 
       <div className="main-content-guru" style={styles.mainContent}>
-        <div style={styles.contentCard}>
+        <div style={activeMenu === 'grafik' ? { ...styles.contentCard, backgroundColor: 'transparent', border: 'none', boxShadow: 'none', padding: 0 } : styles.contentCard}>
+          {activeMenu !== 'grafik' && (
           <div style={styles.contentHeaderRow}>
             <div>
               <h1 style={styles.pageTitle}>
@@ -582,6 +583,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
               </button>
             </div>
           </div>
+          )}
 
           <style>{`
             @media screen and (max-width: 768px) {
@@ -608,12 +610,17 @@ export default function DashboardGuruPiket({ user, onLogout }) {
           {actionMessage && <div style={styles.successMessage}>{actionMessage}</div>}
 
           {activeMenu === 'grafik' && (
-            <div style={styles.statisticsStack}>
-              <div style={styles.cardGrafik}>
-                <h2 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Grafik Statistik Aktivitas Izin</h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-                  Rekapitulasi jumlah izin berdasarkan tanggal, jenis kelamin, kelas, mingguan, dan bulanan.
-                </p>
+            <div style={{ maxWidth: '950px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem clamp(1rem, 4vw, 2rem)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Grafik Statistik Aktivitas Izin</h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                    Rekapitulasi jumlah izin berdasarkan tanggal, jenis kelamin, kelas, mingguan, dan bulanan.
+                  </p>
+                </div>
+                <button onClick={() => muatDataDariDatabase()} disabled={loading} style={{ ...styles.reloadButton, minWidth: '104px' }}>
+                  {loading ? 'Memuat...' : 'Muat Ulang'}
+                </button>
               </div>
 
               {/* Grafik & tabel detail: komponen yang sama persis dengan Dashboard Siswa */}
