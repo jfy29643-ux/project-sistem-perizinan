@@ -600,7 +600,7 @@ export default function DashboardGuruPiket({ user, onLogout }) {
               }
               .main-content-guru {
                 margin-left: 0 !important;
-                padding: 12px !important;
+                padding: 16px !important;
                 padding-top: 64px !important;
               }
             }

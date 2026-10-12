@@ -203,10 +203,10 @@ html, body, #root {
   }
 
   .dashboard-satpam-main > div:last-child {
-    padding: 14px !important;
+    padding: 1rem !important;
   }
 
-  .dashboard-satpam-main > div:last-child > div {
+  .dashboard-satpam-main > div:last-child > div:not(.statistik-wrap) {
     padding: 16px !important;
   }
 }

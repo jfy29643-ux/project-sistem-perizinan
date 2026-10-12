@@ -834,7 +834,7 @@ export default function DashboardSatpam({ user, onLogout }) {
               </div>
             </div>
           ) : (
-            <div style={{ maxWidth: '950px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="statistik-wrap" style={{ maxWidth: '950px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ ...styles.card, border: 'none', padding: '1.5rem clamp(1rem, 4vw, 2rem)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
