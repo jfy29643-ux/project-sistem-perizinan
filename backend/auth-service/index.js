@@ -340,6 +340,76 @@ const KOLOM_SISWA = [
 ];
 const KOLOM_ADMIN = [...KOLOM_SISWA, 'status', 'catatan_verifikasi'];
 
+// ------------------------------------------------------------------
+// rekap_izin_keluar: satu baris = satu periode (semester + tahun ajaran).
+// Kolom: id_rekap, semester, tahun_ajaran, tanggal_mulai, tanggal_selesai
+// Tahun ajaran dimulai Juli:
+//   Juli - Desember  -> semester "Ganjil", tahun ajaran "Y/Y+1"
+//   Januari - Juni   -> semester "Genap",  tahun ajaran "Y-1/Y"
+// Kalau periode untuk tanggal pengajuan belum ada, baris barunya dibuat otomatis.
+// ------------------------------------------------------------------
+const hitungPeriodeRekap = (tanggal) => {
+    let tahun;
+    let bulan;
+    const cocok = String(tanggal || '').match(/^(\d{4})-(\d{2})/);
+    if (cocok) {
+        tahun = Number(cocok[1]);
+        bulan = Number(cocok[2]);
+    } else {
+        const d = new Date();
+        tahun = d.getFullYear();
+        bulan = d.getMonth() + 1;
+    }
+
+    if (bulan >= 7) {
+        return {
+            semester: 'Ganjil',
+            tahun_ajaran: `${tahun}/${tahun + 1}`,
+            tanggal_mulai: `${tahun}-07-01`,
+            tanggal_selesai: `${tahun}-12-31`
+        };
+    }
+    return {
+        semester: 'Genap',
+        tahun_ajaran: `${tahun - 1}/${tahun}`,
+        tanggal_mulai: `${tahun}-01-01`,
+        tanggal_selesai: `${tahun}-06-30`
+    };
+};
+
+const pastikanRekapIzinKeluar = async (tanggal) => {
+    try {
+        const periode = hitungPeriodeRekap(tanggal);
+
+        const cari = () => supabase
+            .from('rekap_izin_keluar')
+            .select('*')
+            .eq('semester', periode.semester)
+            .eq('tahun_ajaran', periode.tahun_ajaran)
+            .order('id_rekap', { ascending: true })
+            .limit(1);
+
+        const { data: ada, error: errCari } = await cari();
+        if (errCari) return { ok: false, pesan: errCari.message, err: errCari };
+        if (ada && ada.length > 0) return { ok: true, data: ada[0], baru: false };
+
+        const { data, error } = await supabase
+            .from('rekap_izin_keluar')
+            .insert([periode])
+            .select();
+
+        if (error) {
+            // kemungkinan baris yang sama baru saja dibuat request lain -> coba baca ulang
+            const { data: ulang } = await cari();
+            if (ulang && ulang.length > 0) return { ok: true, data: ulang[0], baru: false };
+            return { ok: false, pesan: error.message, err: error };
+        }
+        return { ok: true, data: data[0], baru: true };
+    } catch (err) {
+        return { ok: false, pesan: err.message || String(err), err };
+    }
+};
+
 const milikSiswa = (row, user) =>
     String(row.id_pengguna) === String(user.sub) ||
     (row.nama_lengkap &&
@@ -403,7 +473,19 @@ app.post('/pengajuan', wajibPeran('siswa'), async (req, res) => {
 
         if (error) return fail(res, 400, 'Gagal membuat pengajuan.', error);
 
-        return ok(res, { success: true, message: 'Pengajuan berhasil dikirim', data: hasil }, 201);
+        // Masukkan ke rekap_izin_keluar (periode semester & tahun ajaran sesuai tanggal izin)
+        const rekap = await pastikanRekapIzinKeluar(baris.tanggal);
+        if (!rekap.ok) {
+            console.error('Gagal menyimpan ke rekap_izin_keluar ->', rekap.pesan);
+        }
+
+        return ok(res, {
+            success: true,
+            message: 'Pengajuan berhasil dikirim',
+            data: hasil,
+            rekap_izin_keluar: rekap.ok ? rekap.data : null,
+            ...(rekap.ok ? {} : { peringatan: `Pengajuan tersimpan, tetapi gagal mencatat ke rekap_izin_keluar: ${rekap.pesan}` })
+        }, 201);
     } catch (err) {
         return fail(res, 500, 'Terjadi kesalahan pada server.', err);
     }
@@ -513,9 +595,10 @@ const TABEL_PENCATATAN = 'pencatatan_keluar_masuk';
 // jadi kalau dipanggil berkali-kali hasilnya tetap benar dan tidak dobel.
 //  - siswa sudah punya baris di detail_rekap -> jumlah_izin diperbarui
 //  - belum punya baris                      -> baris baru dibuat, id_rekap memakai
-//                                              rekap terbaru di rekap_izin_keluar
+//                                              periode rekap_izin_keluar sesuai tanggal
+//                                              pengajuan (dibuat otomatis kalau belum ada)
 // ------------------------------------------------------------------
-const perbaruiDetailRekap = async (idSiswa) => {
+const perbaruiDetailRekap = async (idSiswa, tanggal) => {
     try {
         const { count, error: errHitung } = await supabase
             .from('pengajuan_izin')
@@ -543,19 +626,12 @@ const perbaruiDetailRekap = async (idSiswa) => {
             return { ok: true, data };
         }
 
-        const { data: rekap, error: errRekap } = await supabase
-            .from('rekap_izin_keluar')
-            .select('id_rekap')
-            .order('id_rekap', { ascending: false })
-            .limit(1);
-        if (errRekap) return { ok: false, pesan: errRekap.message, err: errRekap };
-        if (!rekap || rekap.length === 0) {
-            return { ok: false, pesan: 'tabel rekap_izin_keluar masih kosong, belum ada id_rekap yang bisa dipakai.' };
-        }
+        const rekap = await pastikanRekapIzinKeluar(tanggal);
+        if (!rekap.ok) return { ok: false, pesan: rekap.pesan, err: rekap.err };
 
         const { data, error } = await supabase
             .from('detail_rekap')
-            .insert([{ id_rekap: rekap[0].id_rekap, id_siswa: idSiswa, jumlah_izin: jumlah }])
+            .insert([{ id_rekap: rekap.data.id_rekap, id_siswa: idSiswa, jumlah_izin: jumlah }])
             .select();
         if (error) return { ok: false, pesan: error.message, err: error };
         return { ok: true, data };
@@ -663,7 +739,7 @@ app.post('/pengajuan/:id/verifikasi', wajibPeran('satpam'), async (req, res) => 
         }
 
         // 3. detail_rekap (jumlah pengajuan izin siswa)
-        const hasilRekap = await perbaruiDetailRekap(row.id_pengguna);
+        const hasilRekap = await perbaruiDetailRekap(row.id_pengguna, row.tanggal);
         if (!hasilRekap.ok) {
             await batalkan();
             return fail(res, 400, `Gagal menyimpan ke tabel detail_rekap: ${hasilRekap.pesan}`, hasilRekap.err);
